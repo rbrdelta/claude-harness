@@ -61,4 +61,24 @@ else
     fi
 fi
 
+# --- Apple Notes sync ---
+# Picks up exports from iPhone Shortcut → iCloud Drive.
+# No-op if no new files landed since last sync.
+APPLE_LOG="$HOME/.claude/hooks/apple-sync.log"
+
+apple_log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') $1" >> "$APPLE_LOG"
+}
+
+apple_log "START: Running Apple Notes sync..."
+APPLE_OUTPUT=$(npm run apple:sync 2>&1)
+APPLE_EXIT=$?
+
+if [ $APPLE_EXIT -eq 0 ]; then
+    APPLE_SUMMARY=$(echo "$APPLE_OUTPUT" | grep -oP '\{.*\}' | tail -1)
+    apple_log "OK: $APPLE_SUMMARY"
+else
+    apple_log "FAIL (exit $APPLE_EXIT): $(echo "$APPLE_OUTPUT" | tail -3 | tr '\n' ' ')"
+fi
+
 exit 0

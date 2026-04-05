@@ -62,12 +62,42 @@ w=$(check_agent_job "NORTHSTAR" "$HOME/.claude/hooks/weekly-northstar-check.log"
 w=$(check_agent_job "DIGEST" "$HOME/.claude/hooks/weekly-digest.log" 10)
 [ -n "$w" ] && warnings="$warnings$w. "
 
-# --- 4. Remote-control bridge (informational) ---
+# --- 4. Git hygiene: active projects ---
+for dir in ~/projects/active/*/; do
+    [ ! -d "$dir" ] && continue
+    name=$(basename "$dir")
+    if [ ! -d "$dir/.git" ]; then
+        # Skip parent dirs that only contain nested git repos (e.g. web/)
+        has_nested_git=false
+        for sub in "$dir"*/; do
+            [ -d "$sub/.git" ] && has_nested_git=true && break
+        done
+        $has_nested_git && continue
+        warnings="${warnings}NO GIT: $name. "
+    else
+        uncommitted=$(git -C "$dir" status --porcelain 2>/dev/null | wc -l)
+        if [ "$uncommitted" -gt 10 ]; then
+            warnings="${warnings}DIRTY($uncommitted): $name. "
+        fi
+    fi
+done
+# Also check nested active dirs (e.g. ~/projects/active/web/*)
+for dir in ~/projects/active/*/*/; do
+    [ ! -d "$dir" ] && continue
+    [ -d "$dir/.git" ] || continue  # only flag git repos here, not every subfolder
+    name=$(basename "$(dirname "$dir")")/$(basename "$dir")
+    uncommitted=$(git -C "$dir" status --porcelain 2>/dev/null | wc -l)
+    if [ "$uncommitted" -gt 10 ]; then
+        warnings="${warnings}DIRTY($uncommitted): $name. "
+    fi
+done
+
+# --- 5. Remote-control bridge (informational) ---
 if ! pgrep -f "claude remote-control" > /dev/null 2>&1; then
     warnings="${warnings}BRIDGE DOWN. "
 fi
 
-# --- 5. Output ---
+# --- 6. Output ---
 if [ -n "$warnings" ]; then
     echo "HARNESS: ${warnings}Run /harness for details."
 fi
