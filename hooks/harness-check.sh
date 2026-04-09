@@ -97,7 +97,35 @@ if ! pgrep -f "claude remote-control" > /dev/null 2>&1; then
     warnings="${warnings}BRIDGE DOWN. "
 fi
 
-# --- 6. Output ---
+# --- 6. Catch-up sync: if vault sync is stale and key exists, fire it now ---
+SYNC_SCRIPT="$HOME/.claude/hooks/vault-sync.sh"
+KEY_FILE="$HOME/.claude_session_key"
+VAULT_LOG="$HOME/.claude/hooks/vault-sync.log"
+
+if [ -f "$SYNC_SCRIPT" ] && [ -f "$KEY_FILE" ]; then
+    key_content=$(cat "$KEY_FILE" | tr -d '[:space:]')
+    if [ -n "$key_content" ]; then
+        needs_sync=false
+        if [ ! -f "$VAULT_LOG" ]; then
+            needs_sync=true
+        else
+            last_ok=$(grep "OK:" "$VAULT_LOG" 2>/dev/null | tail -1 | cut -d' ' -f1-2)
+            if [ -z "$last_ok" ]; then
+                needs_sync=true
+            else
+                last_ts=$(date -d "$last_ok" +%s 2>/dev/null)
+                now=$(date +%s)
+                age_hours=$(( (now - last_ts) / 3600 ))
+                [ "$age_hours" -ge 8 ] && needs_sync=true
+            fi
+        fi
+        if $needs_sync; then
+            nohup bash "$SYNC_SCRIPT" > /dev/null 2>&1 &
+        fi
+    fi
+fi
+
+# --- 7. Output ---
 if [ -n "$warnings" ]; then
     echo "HARNESS: ${warnings}Run /harness for details."
 fi

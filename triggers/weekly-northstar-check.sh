@@ -4,7 +4,7 @@
 
 LOG_FILE="$HOME/.claude/hooks/weekly-northstar-check.log"
 OUTPUT_DIR="$HOME/.claude/logs"
-WORK_DIR="$HOME/projects/active/web/rowbyroh-website"
+WORK_DIR="$HOME/projects/active/claude-harness"
 
 log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $1" >> "$LOG_FILE"; }
 

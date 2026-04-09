@@ -1,0 +1,27 @@
+{
+  "name": "claude-harness",
+  "version": "1.0.0",
+  "description": "rbr01 agentic harness",
+  "main": "index.js",
+  "scripts": {
+    "compile": "npx tsx compile-task.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rbrdelta/claude-harness.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/rbrdelta/claude-harness/issues"
+  },
+  "homepage": "https://github.com/rbrdelta/claude-harness#readme",
+  "devDependencies": {
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2",
+    "yaml": "^2.8.3"
+  }
+}
