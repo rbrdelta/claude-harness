@@ -67,7 +67,9 @@ status: active
 
 2. Update the Master Backlog checkboxes at `/mnt/c/MCP/Inbox/Master Backlog.md` to reflect current state (check off completed items).
 
-3. End with a one-line verdict: "Week N: [summary]"'
+3. Run `python3 ~/.claude/hooks/session-stats.py --trends-md --months 1` and include its output as a "## Claude Code Usage" section in the review note. This shows token costs and weekly trends.
+
+4. End with a one-line verdict: "Week N: [summary]"'
 
 OUTPUT_FILE="$OUTPUT_DIR/sprint-review-$(date +%Y-%m-%d).txt"
 mkdir -p "$OUTPUT_DIR"
