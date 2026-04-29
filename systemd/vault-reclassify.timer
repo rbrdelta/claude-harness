@@ -1,0 +1,10 @@
+[Unit]
+Description=Weekly vault reclassification — Sunday 14:00, with catch-up
+
+[Timer]
+OnCalendar=Sun 14:00
+Persistent=true
+Unit=vault-reclassify.service
+
+[Install]
+WantedBy=timers.target

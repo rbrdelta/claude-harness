@@ -1,0 +1,6 @@
+[Unit]
+Description=Weekly status digest
+
+[Service]
+Type=oneshot
+ExecStart=/home/rbr01/.claude/hooks/weekly-digest.sh

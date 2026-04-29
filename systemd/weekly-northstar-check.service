@@ -1,0 +1,6 @@
+[Unit]
+Description=Weekly NorthStar freshness check
+
+[Service]
+Type=oneshot
+ExecStart=/home/rbr01/.claude/hooks/weekly-northstar-check.sh

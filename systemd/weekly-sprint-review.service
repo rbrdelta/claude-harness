@@ -1,0 +1,6 @@
+[Unit]
+Description=Weekly sprint review
+
+[Service]
+Type=oneshot
+ExecStart=/home/rbr01/.claude/hooks/weekly-sprint-review.sh

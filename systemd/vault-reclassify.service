@@ -1,0 +1,6 @@
+[Unit]
+Description=Vault reclassification (weekly taxonomy re-apply)
+
+[Service]
+Type=oneshot
+ExecStart=/home/rbr01/.claude/hooks/vault-reclassify.sh

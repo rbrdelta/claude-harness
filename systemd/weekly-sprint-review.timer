@@ -1,0 +1,10 @@
+[Unit]
+Description=Weekly sprint review — Friday 22:00, with catch-up
+
+[Timer]
+OnCalendar=Fri 22:00
+Persistent=true
+Unit=weekly-sprint-review.service
+
+[Install]
+WantedBy=timers.target

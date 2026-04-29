@@ -1,0 +1,10 @@
+[Unit]
+Description=Weekly NorthStar freshness check — Wednesday 13:00, with catch-up
+
+[Timer]
+OnCalendar=Wed 13:00
+Persistent=true
+Unit=weekly-northstar-check.service
+
+[Install]
+WantedBy=timers.target

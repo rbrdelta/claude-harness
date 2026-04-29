@@ -1,0 +1,10 @@
+[Unit]
+Description=Weekly status digest — Sunday 13:00, with catch-up
+
+[Timer]
+OnCalendar=Sun 13:00
+Persistent=true
+Unit=weekly-digest.service
+
+[Install]
+WantedBy=timers.target
