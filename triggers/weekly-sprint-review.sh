@@ -1,6 +1,7 @@
 #!/bin/bash
-# Weekly Sprint Review — runs via local cron, Fridays at 10pm
-# Uses claude -p to run headlessly. No remote-control bridge needed.
+# Weekly Retro Prep — runs via local cron, Fridays at 10pm
+# Outputs a PREP DOC (data + open questions) for Daniel to walk through via /retro.
+# Does NOT produce conclusions or verdicts — those come from the live /retro session.
 
 LOG_FILE="$HOME/.claude/hooks/weekly-sprint-review.log"
 OUTPUT_DIR="$HOME/.claude/logs"
@@ -16,60 +17,71 @@ if ! command -v claude &>/dev/null; then
     exit 1
 fi
 
-log "START: Running weekly sprint review..."
+log "START: Running weekly retro prep..."
 
-PROMPT='You are Daniel'\''s /architect running a weekly sprint review.
+PROMPT='You are preparing data for Daniel'\''s weekly retrospective. You are NOT writing conclusions, verdicts, or pattern-match summaries. Your job is to surface data + open questions so Daniel can walk through the prep doc himself via /retro.
+
+## Hard rules
+- NO verdict line. NO "Week N: [summary]" closer.
+- NO conclusions about whether things "moved" or "stalled" — present evidence, let Daniel judge.
+- NO Claude-coined framings (no "themes," "buckets," "patterns emerging"). Surface raw signals.
+- Open questions go at the end. Daniel answers them in /retro, not you.
 
 ## Task
 
-Read the following files from the vault at /mnt/c/MCP and produce a progress assessment:
+Read the following files from the vault at /mnt/c/MCP:
 
-1. Read `/mnt/c/MCP/Inbox/Master Backlog.md` — check the "30-Day Shipping Sprint (2026-03-27 → 2026-04-27)" section
-2. Read `/mnt/c/MCP/Inbox/PM Decisions — 2026-03-27.md` — the prioritization decisions
-3. Read `/mnt/c/MCP/Inbox/Architect Handoff — 2026-03-27.md` — the original gap analysis
+1. `/mnt/c/MCP/Inbox/Master Backlog.md` — current sprint items + checkbox state
+2. `/mnt/c/MCP/Inbox/PM Decisions — 2026-03-27.md` — prioritization decisions
+3. All sprint contracts and handoffs from the past 7 days: `ls -lt /mnt/c/MCP/Inbox/Sprint* /mnt/c/MCP/Inbox/*Handoff* 2>/dev/null | head -20`
+4. All debriefs from the past 7 days: `ls -lt /mnt/c/MCP/Inbox/Debrief* 2>/dev/null | head -10`
 
-## Assessment
+## Surface this data (no interpretation)
 
-For each of the 7 sprint items, assess current status:
-- Done (checkbox checked in backlog, or evidence of completion in the repo/vault)
-- In progress (partial evidence)
-- Not started
+### Sprint items — current checkbox state
+For each item in the 30-day shipping sprint, copy the checkbox line verbatim from the backlog. If a checkbox flipped this week, note the date from the handoff. Do not assess "in progress" vs "not started" — just show the state.
 
-Check for evidence:
-- Deadweight GitHub repo: run `ls ~/projects/active/deadweight/.git` and check if there'\''s a remote with `cd ~/projects/active/deadweight && git remote -v`
-- Blog post / write-up: search vault with `grep -r '\''freight audit'\'' /mnt/c/MCP/Inbox/` or similar
-- Eval suite: check for test files in Deadweight project
-- Property manager calls: search vault for notes about composter outreach
+### Sprint metrics from this week
+For each sprint contract found in the past 7 days, extract:
+- Sprint name + date
+- Mode declared (Crystallization/Discovery/Execution) — if field is missing, say "(no mode field)"
+- Predicted drafts/cycles — if missing, say "(not predicted)"
+- Actual drafts/cycles from the matching handoff — if missing, say "(not captured)"
+- Mode match (Yes/No) from handoff — if missing, say "(not captured)"
+- Frame held (Yes/No) from handoff — if missing or N/A, say so
 
-## Readiness Scores
+Present this as a table. Don'\''t comment on it.
 
-Update the three readiness scores based on what actually shipped:
-- AI PM (Agentic Systems): baseline 65-70%
-- Claude Certified Architect — Foundations: baseline 80-85%
-- Solo Founder (Freight/Composter): baseline 55-60%
+### Walk-through triggers fired
+List which sprints from this week fired a walk-through trigger (drafts >50% over prediction, mode mismatch, frame did not hold, discovery mode, or "couldn'\''t articulate" flag). Just the list.
 
-Be honest. If nothing moved, say so directly.
+### Claude Code usage
+Run `python3 ~/.claude/hooks/session-stats.py --trends-md --months 1` and include its output as a "## Claude Code Usage" section.
+
+## Open questions for Daniel (the actual handoff)
+
+End the prep doc with 3-5 open questions for Daniel to answer in /retro. Examples (do NOT copy verbatim — generate from the actual data):
+- "Sprint X declared Crystallization but mode-match was No. What was the work actually?"
+- "Drafts on Sprint Y exceeded prediction by 80%. Was the frame depth wrong upfront, or did the work shift mid-sprint?"
+- "Three sprints this week skipped the Mode field. Should the contract template enforce it, or is the field optional?"
+
+Questions should target framework adjustment decisions, not status updates.
 
 ## Output
 
-1. Write the assessment as a new markdown file at `/mnt/c/MCP/Inbox/Weekly Sprint Review — [today'\''s date YYYY-MM-DD].md` with this frontmatter:
+Write the prep doc to `/mnt/c/MCP/Inbox/Retro Prep — [today'\''s date YYYY-MM-DD].md` with frontmatter:
 ```
 ---
-title: "Weekly Sprint Review — [date]"
-source: architect-session
+title: "Retro Prep — [date]"
+source: weekly-cron
 tags:
-  - handoff
-  - architect
-  - sprint-review
+  - retro-prep
 status: active
 ---
 ```
 
-2. Update the Master Backlog checkboxes at `/mnt/c/MCP/Inbox/Master Backlog.md` to reflect current state (check off completed items).
-
-3. Run `python3 ~/.claude/hooks/session-stats.py --trends-md --months 1` and include its output as a "## Claude Code Usage" section in the review note. This shows token costs and weekly trends.
-
-4. End with a one-line verdict: "Week N: [summary]"'
+End the file with this exact line:
+`Ready for /retro walk-through. Open questions above.`'
 
 OUTPUT_FILE="$OUTPUT_DIR/sprint-review-$(date +%Y-%m-%d).txt"
 mkdir -p "$OUTPUT_DIR"
@@ -84,9 +96,8 @@ EXIT_CODE=$?
 echo "$OUTPUT" > "$OUTPUT_FILE"
 
 if [ $EXIT_CODE -eq 0 ]; then
-    SUMMARY=$(echo "$OUTPUT" | grep -oP 'Week \d+:.*' | head -1)
-    [ -z "$SUMMARY" ] && SUMMARY=$(echo "$OUTPUT" | tail -3 | head -1)
-    log "OK: $SUMMARY"
+    PREP_FILE=$(ls -t /mnt/c/MCP/Inbox/Retro\ Prep\ —\ *.md 2>/dev/null | head -1)
+    log "OK: prep doc written to $PREP_FILE — run /retro to walk through"
 else
     log "FAIL (exit $EXIT_CODE): $(echo "$OUTPUT" | tail -3 | tr '\n' ' ')"
 fi

@@ -97,6 +97,22 @@ if ! pgrep -f "claude remote-control" > /dev/null 2>&1; then
     warnings="${warnings}BRIDGE DOWN. "
 fi
 
+# --- 5b. Retro prep ready ---
+# Banner if a Retro Prep doc exists with no matching Retrospective written after it.
+INBOX="/mnt/c/MCP/Inbox"
+latest_prep=$(ls -t "$INBOX"/Retro\ Prep\ —\ *.md 2>/dev/null | head -1)
+if [ -n "$latest_prep" ]; then
+    prep_date=$(basename "$latest_prep" | sed -E 's/^Retro Prep — (.+)\.md$/\1/')
+    matching_retro="$INBOX/Retrospective — ${prep_date}.md"
+    walked=false
+    if [ -f "$matching_retro" ] && [ "$matching_retro" -nt "$latest_prep" ]; then
+        walked=true
+    fi
+    if ! $walked; then
+        warnings="${warnings}RETRO PREP READY (${prep_date}): run /retro. "
+    fi
+fi
+
 # --- 6. Catch-up sync: if vault sync is stale and key exists, fire it now ---
 SYNC_SCRIPT="$HOME/.claude/hooks/vault-sync.sh"
 KEY_FILE="$HOME/.claude_session_key"
