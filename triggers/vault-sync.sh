@@ -90,6 +90,7 @@ fi
 # Picks up exports from iPhone Shortcut → iCloud Drive.
 # No-op if no new files landed since last sync.
 APPLE_LOG="$HOME/.claude/hooks/apple-sync.log"
+export APPLE_NOTES_PATH="/mnt/c/Users/deero/iCloudDrive/NotesExport"
 
 apple_log() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') $1" >> "$APPLE_LOG"
