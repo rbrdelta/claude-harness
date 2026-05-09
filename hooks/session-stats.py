@@ -177,6 +177,25 @@ def parse_session(jsonl_path):
                     msg = obj.get("message", {})
                     if isinstance(msg, dict):
                         content = msg.get("content", "")
+                        # Normalize to a string for marker detection (handles list-shape messages)
+                        text = content if isinstance(content, str) else ""
+                        if isinstance(content, list):
+                            for blk in content:
+                                if isinstance(blk, dict) and blk.get("type") == "text":
+                                    text = blk.get("text", "")
+                                    break
+
+                        # Skill expansion marker. Slash commands have no
+                        # sourceToolUseID; Skill-tool calls do (counted via
+                        # the assistant tool_use branch into skills_used).
+                        if text.startswith("Base directory for this skill:"):
+                            import re
+                            m = re.match(r"Base directory for this skill:\s*\S*/skills/([^\s/]+)", text)
+                            if m and not obj.get("sourceToolUseID"):
+                                skill = m.group(1)
+                                if skill not in metrics["commands_used"]:
+                                    metrics["commands_used"].append(skill)
+
                         if isinstance(content, str) and metrics["user_messages"] <= 2 and not metrics["first_user_message"]:
                             # Skip skill/command expansions, get the actual user prompt
                             if not content.startswith("Base directory for this skill"):
