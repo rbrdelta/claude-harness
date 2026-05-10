@@ -97,6 +97,16 @@ if ! pgrep -f "claude remote-control" > /dev/null 2>&1; then
     warnings="${warnings}BRIDGE DOWN. "
 fi
 
+# --- 5a. Remote-control log size (flag if >1MB so we can prune/rotate) ---
+RC_LOG="$HOME/.claude/remote-control-health.log"
+if [ -f "$RC_LOG" ]; then
+    rc_bytes=$(stat -c %s "$RC_LOG" 2>/dev/null)
+    if [ -n "$rc_bytes" ] && [ "$rc_bytes" -gt 1000000 ]; then
+        rc_mb=$(( rc_bytes / 1048576 ))
+        warnings="${warnings}REMOTE-CTL LOG ${rc_mb}MB. "
+    fi
+fi
+
 # --- 5b. Retro prep ready ---
 # Banner if a Retro Prep doc exists with no matching Retrospective written after it.
 INBOX="/mnt/c/MCP/Inbox"
