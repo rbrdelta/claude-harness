@@ -9,6 +9,29 @@ WORK_DIR="$HOME/projects/active/claude-harness"
 
 log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $1" >> "$LOG_FILE"; }
 
+# --- July 2026 focus pace nudge (self-expires after 2026-07-31) ---
+# Pushes a Telegram readout of core-window pace vs 4/week. Independent of the
+# retro-prep run below; no-op outside the July focus window.
+TODAY=$(date +%Y-%m-%d)
+if [[ "$TODAY" > "2026-06-30" && "$TODAY" < "2026-08-01" ]]; then
+    CHARTER="/mnt/c/MCP/Inbox/July 2026 Charter — Research PM, All-In.md"
+    if [ -f "$CHARTER" ]; then
+        dow=$(date +%u)
+        WK=$(date -d "-$((dow-1)) days" +%Y-%m-%d)
+        N=$(grep -oE '^\| 2026-[0-9]{2}-[0-9]{2} ' "$CHARTER" 2>/dev/null \
+            | tr -d '| ' | awk -v w="$WK" '$1 >= w' | wc -l | tr -d ' ')
+        TG_TOKEN="$(grep TELEGRAM_BOT_TOKEN "$HOME/.claude/channels/telegram/.env" 2>/dev/null | cut -d= -f2)"
+        TG_CHAT_ID="8691823610"
+        if [ -n "$TG_TOKEN" ]; then
+            if [ "$N" -lt 4 ]; then PACE="Behind pace — $((4-N)) to go this week."; else PACE="On pace."; fi
+            MSG="[July Focus] Core windows this week: ${N}/4. ${PACE} Spine: Shadow Ledger strain arc + Anticipation Prototype."
+            curl -s -o /dev/null "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+                -d "chat_id=${TG_CHAT_ID}" -d "text=${MSG}"
+            log "July focus nudge sent: ${N}/4"
+        fi
+    fi
+fi
+
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 
