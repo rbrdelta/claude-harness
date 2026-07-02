@@ -58,6 +58,11 @@ EXIT_CODE=$?
 
 echo "$OUTPUT" > "$OUTPUT_FILE"
 
+# July window-pace gauge (deterministic; self-expires Jul 31). Append the ground-truth
+# window count to the digest note the agent just wrote (if it exists).
+DIGEST_NOTE="/mnt/c/MCP/Inbox/Weekly Digest — $(date +%Y-%m-%d).md"
+"$WORK_DIR/hooks/july-pace-gauge.sh" "$DIGEST_NOTE" 2>/dev/null && log "pace-gauge appended to digest note"
+
 if [ $EXIT_CODE -eq 0 ]; then
     SUMMARY=$(echo "$OUTPUT" | tail -3 | head -1)
     log "OK: $SUMMARY"

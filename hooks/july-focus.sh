@@ -18,14 +18,14 @@ CHARTER="/mnt/c/MCP/Inbox/July 2026 Charter — Research PM, All-In.md"
 dow=$(date +%u)
 WEEK_START=$(date -d "-$((dow-1)) days" +%Y-%m-%d)
 
-# Count window-log rows dated within the current week (rows like: | 2026-07-03 | 1 | ...)
-LOGGED=$(grep -oE '^\| 2026-[0-9]{2}-[0-9]{2} ' "$CHARTER" 2>/dev/null \
-    | tr -d '| ' \
-    | awk -v w="$WEEK_START" '$1 >= w' \
-    | wc -l | tr -d ' ')
+# Deterministic pace read-out with mode breakdown, via the shared gauge (guaranteed
+# surface — SessionStart always fires, unlike the weekly cron). Falls back gracefully.
+DIR="$(dirname "$(readlink -f "$0")")"
+PACE=$("$DIR/july-pace-gauge.sh" --line 2>/dev/null)
+[ -z "$PACE" ] && PACE="(pace gauge unavailable)"
 
 cat <<EOF
-[JULY FOCUS — Research-PM, all-in | week-to-date: ${LOGGED}/4 core windows]
+[JULY FOCUS — Research-PM, all-in | windows this week: ${PACE}]
 HARD RULE this session (Charter: "July 2026 Charter — Research PM, All-In"). Before engaging whatever the user opens with, your FIRST message must propose the next core window from the spine — Shadow Ledger strain arc (primary) or Anticipation Prototype (secondary), framed as a Build / Learn / Write-share window (default mix 2 build / 1 learn / 1 write-share, flexible). If the user's opening request is NOT on-spine, name that plainly, state the on-spine alternative, and ask Daniel for a good reason to deviate. Do not silently comply with off-spine work — proceed only after he gives the reason. This is Daniel's standing instruction for all of July; it self-expires Aug 1.
 EOF
 exit 0
