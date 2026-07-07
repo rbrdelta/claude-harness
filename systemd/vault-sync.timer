@@ -1,0 +1,10 @@
+[Unit]
+Description=Vault sync (Claude.ai + Apple Notes) — every 8h, with catch-up
+
+[Timer]
+OnCalendar=*-*-* 00/8:00:00
+Persistent=true
+Unit=vault-sync.service
+
+[Install]
+WantedBy=timers.target

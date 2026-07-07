@@ -1,0 +1,6 @@
+[Unit]
+Description=Vault sync (Claude.ai + Apple Notes)
+
+[Service]
+Type=oneshot
+ExecStart=/home/rbr01/.claude/hooks/vault-sync.sh

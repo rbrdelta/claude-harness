@@ -1,0 +1,10 @@
+[Unit]
+Description=Notion sync — every 6h, with catch-up
+
+[Timer]
+OnCalendar=*-*-* 00/6:00:00
+Persistent=true
+Unit=notion-sync.service
+
+[Install]
+WantedBy=timers.target

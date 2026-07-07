@@ -1,0 +1,6 @@
+[Unit]
+Description=Notion sync
+
+[Service]
+Type=oneshot
+ExecStart=/home/rbr01/.claude/hooks/notion-sync.sh

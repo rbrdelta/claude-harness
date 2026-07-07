@@ -1,3 +1,1 @@
-0 */8 * * * /home/rbr01/.claude/hooks/vault-sync.sh
-0 */6 * * * /home/rbr01/.claude/hooks/notion-sync.sh
 */5 * * * * /home/rbr01/.claude/hooks/remote-control-health.sh
