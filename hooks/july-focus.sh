@@ -5,6 +5,11 @@
 # Mechanism: SessionStart stdout is surfaced to the model as context. This is a
 # strong standing instruction, not a hard block — enforcement is Claude following it.
 
+# Scheduled/headless jobs exempt themselves by exporting HARNESS_SCHEDULED=1.
+# The window-proposal rule assumes a human is present to answer; in a headless run
+# it halts the job with a question nobody can answer (observed 2026-07-20).
+[ -n "$HARNESS_SCHEDULED" ] && exit 0
+
 TODAY=$(date +%Y-%m-%d)
 START="2026-06-29"
 END="2026-07-31"

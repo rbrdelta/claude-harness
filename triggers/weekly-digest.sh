@@ -8,6 +8,9 @@ WORK_DIR="$HOME/projects/active/claude-harness"
 
 log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $1" >> "$LOG_FILE"; }
 
+# Headless run: exempt from the july-focus session-open rule (see july-focus.sh)
+export HARNESS_SCHEDULED=1
+
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 
@@ -63,11 +66,12 @@ echo "$OUTPUT" > "$OUTPUT_FILE"
 DIGEST_NOTE="/mnt/c/MCP/Inbox/Weekly Digest — $(date +%Y-%m-%d).md"
 "$WORK_DIR/hooks/july-pace-gauge.sh" "$DIGEST_NOTE" 2>/dev/null && log "pace-gauge appended to digest note"
 
-if [ $EXIT_CODE -eq 0 ]; then
+# Success = a digest note dated TODAY exists (same false-OK class as sprint-review).
+if [ $EXIT_CODE -eq 0 ] && [ -f "$DIGEST_NOTE" ]; then
     SUMMARY=$(echo "$OUTPUT" | tail -3 | head -1)
     log "OK: $SUMMARY"
 else
-    log "FAIL (exit $EXIT_CODE): $(echo "$OUTPUT" | tail -3 | tr '\n' ' ')"
+    log "FAIL (exit $EXIT_CODE): no digest note dated today. Output tail: $(echo "$OUTPUT" | tail -3 | tr '\n' ' ')"
 fi
 
 exit 0

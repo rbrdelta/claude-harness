@@ -32,6 +32,9 @@ if [[ "$TODAY" > "2026-06-30" && "$TODAY" < "2026-08-01" ]]; then
     fi
 fi
 
+# Headless run: exempt from the july-focus session-open rule (see july-focus.sh)
+export HARNESS_SCHEDULED=1
+
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 
@@ -118,11 +121,13 @@ EXIT_CODE=$?
 
 echo "$OUTPUT" > "$OUTPUT_FILE"
 
-if [ $EXIT_CODE -eq 0 ]; then
-    PREP_FILE=$(ls -t /mnt/c/MCP/Inbox/Retro\ Prep\ —\ *.md 2>/dev/null | head -1)
+# Success = a prep doc dated TODAY exists. exit 0 + any old prep file is not
+# success (false-OK observed 2026-07-20: run produced nothing, logged OK).
+PREP_FILE="/mnt/c/MCP/Inbox/Retro Prep — $(date +%Y-%m-%d).md"
+if [ $EXIT_CODE -eq 0 ] && [ -f "$PREP_FILE" ]; then
     log "OK: prep doc written to $PREP_FILE — run /retro to walk through"
 else
-    log "FAIL (exit $EXIT_CODE): $(echo "$OUTPUT" | tail -3 | tr '\n' ' ')"
+    log "FAIL (exit $EXIT_CODE): no prep doc dated today. Output tail: $(echo "$OUTPUT" | tail -3 | tr '\n' ' ')"
 fi
 
 exit 0
