@@ -66,6 +66,12 @@ echo "$OUTPUT" > "$OUTPUT_FILE"
 DIGEST_NOTE="/mnt/c/MCP/Inbox/Weekly Digest — $(date +%Y-%m-%d).md"
 "$WORK_DIR/hooks/july-pace-gauge.sh" "$DIGEST_NOTE" 2>/dev/null && log "pace-gauge appended to digest note"
 
+# Standing-advice expiry check (deterministic). Surfaces register rows past their
+# review-by date so standing advice can't outlive its conditions silently.
+# Register: /mnt/c/MCP/Meta/Standing Advice Register.md
+"$WORK_DIR/hooks/advice-expiry-check.sh" "$DIGEST_NOTE" 2>/dev/null
+log "advice-expiry check ran"
+
 # Success = a digest note dated TODAY exists (same false-OK class as sprint-review).
 if [ $EXIT_CODE -eq 0 ] && [ -f "$DIGEST_NOTE" ]; then
     SUMMARY=$(echo "$OUTPUT" | tail -3 | head -1)
