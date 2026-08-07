@@ -57,12 +57,23 @@ function getTargetString(toolName, toolInput) {
   }
 }
 
+// Engine semantics: a Read rule covers ALL file-reading tools; an Edit rule
+// covers ALL file-editing tools. Write/Glob/Grep rules are NOT matched by the
+// permission engine (it emits a startup warning telling you to use Read/Edit).
+// The report must mirror this or it reports phantom gaps for Write calls.
+const RULE_FAMILY = {
+  Read: ['Read', 'Glob', 'Grep'],
+  Edit: ['Edit', 'Write', 'MultiEdit', 'NotebookEdit'],
+};
+
 function matchesRule(rule, toolName, toolInput) {
   const parsed = parseRule(rule);
   if (!parsed) return false;
 
-  // Tool name must match
-  if (parsed.tool !== toolName) return false;
+  // Tool name must match — exactly, or via the engine's read/edit family coverage
+  const covers = parsed.tool === toolName ||
+    (RULE_FAMILY[parsed.tool] && RULE_FAMILY[parsed.tool].includes(toolName));
+  if (!covers) return false;
 
   // No pattern means match any invocation of this tool
   if (!parsed.pattern) return true;
@@ -125,7 +136,12 @@ function suggestRule(toolName, toolInput) {
     const prefix = segments.slice(0, depth).join('/');
     // Use // prefix for absolute paths (Claude Code convention)
     const rulePrefix = prefix.startsWith('/') ? '/' + prefix : prefix;
-    return `${toolName}(${rulePrefix}/**)`;
+    // Emit the rule the ENGINE honors: Read covers read-family, Edit covers
+    // edit-family. Suggesting Write(...)/Glob(...) would be a dead no-op.
+    const ruleTool = RULE_FAMILY.Read.includes(toolName) ? 'Read'
+      : RULE_FAMILY.Edit.includes(toolName) ? 'Edit'
+      : toolName;
+    return `${ruleTool}(${rulePrefix}/**)`;
   }
 
   return `${toolName}`;
