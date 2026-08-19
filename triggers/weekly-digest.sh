@@ -29,12 +29,13 @@ Your job:
    - Glob for `/mnt/c/MCP/Inbox/Tasks*` and `/mnt/c/MCP/Inbox/Weekly Digest*`
    - Grep across `/mnt/c/MCP/Sources/Claude-Conversations/` for recent action items, decisions, and commitments (search for patterns like '\''TODO'\'', '\''action item'\'', '\''next step'\'', '\''blocker'\'')
 3. Read the most recent Weekly Digest note if one exists to compare progress.
-4. Generate a weekly status rollup with these sections:
+4. Verify inherited rows against the territory before repeating them. For every Blocked or In Progress item carried from the prior digest that names a file, artifact, branch, or path: check the filesystem first (ls, test, git log) before restating its status. If the named artifact exists on disk, do not carry the row forward — move it to Completed, note the date found, and flag that the tracker was stale. Never increment a row age without re-verifying this week that the blocker still holds. A blocked row is a claim about the territory, not a fact inherited from the prior digest. (Rule added 2026-08-18: DESIGN-HISTORY.md sat finished on disk for 18 days while digests escalated it as not started.)
+5. Generate a weekly status rollup with these sections:
    - **Completed This Week** — tasks/commitments that were resolved
    - **In Progress** — active work across all projects
    - **Blocked** — items waiting on external dependencies
    - **Recommended Focus** — what to prioritize in the coming week, based on NorthStar priorities and blockers
-5. Write the rollup to `/mnt/c/MCP/Inbox/Weekly Digest — YYYY-MM-DD.md` (use today'\''s date) with frontmatter:
+6. Write the rollup to `/mnt/c/MCP/Inbox/Weekly Digest — YYYY-MM-DD.md` (use today'\''s date) with frontmatter:
    ```
    ---
    title: "Weekly Digest — YYYY-MM-DD"
