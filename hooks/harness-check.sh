@@ -123,6 +123,18 @@ if [ -n "$latest_prep" ]; then
     fi
 fi
 
+# --- 5c. Obsidian nightly restart (Windows Task Scheduler) ---
+# Restarting Obsidian forces a full Sync reconciliation, so files the live upload silently
+# skipped still reach mobile (Learnings 2026-09-18). Job: windows/obsidian-restart.ps1,
+# installer: windows/install-obsidian-restart.ps1. Log lines: "<ts> OK: ..." / "<ts> FAIL: ...".
+OBSIDIAN_RESTART_LOG="/mnt/c/Users/deero/AppData/Local/claude-harness/obsidian-restart.log"
+if [ ! -f "$OBSIDIAN_RESTART_LOG" ]; then
+    warnings="${warnings}OBSIDIAN RESTART: NO LOG (task not installed?). "
+else
+    w=$(check_agent_job "OBSIDIAN RESTART" "$OBSIDIAN_RESTART_LOG" 3)
+    [ -n "$w" ] && warnings="$warnings$w. "
+fi
+
 # --- 6. Catch-up sync: if vault sync is stale and key exists, fire it now ---
 SYNC_SCRIPT="$HOME/.claude/hooks/vault-sync.sh"
 KEY_FILE="$HOME/.claude_session_key"

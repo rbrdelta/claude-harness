@@ -22,6 +22,10 @@ Pattern: `claude -p "$PROMPT" --model claude-sonnet-4-6 --allowedTools "Bash,Rea
 - `weekly-northstar-check.sh` Wed 1pm — NorthStar freshness check
 - `weekly-digest.sh` Sun 1pm — Weekly status rollup
 
+## Windows Host Tasks
+
+- `windows/obsidian-restart.ps1` — Task Scheduler "Obsidian nightly restart", daily 04:00. Forces a full Obsidian Sync reconciliation (live upload can silently skip files; Learnings 2026-09-18). Install/update: `windows/install-obsidian-restart.ps1`. Log: `%LOCALAPPDATA%\claude-harness\obsidian-restart.log`, checked by `harness-check.sh`.
+
 ## Hooks
 
 - `harness-check.sh` — SessionStart health check (cron, sync logs, weekly agents, bridge)
