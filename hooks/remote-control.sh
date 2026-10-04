@@ -59,10 +59,12 @@ case "${1:-start}" in
         # on it — source nvm directly here.
         export NVM_DIR="$HOME/.nvm"
         [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" >/dev/null 2>&1
+        # Native installer puts claude in ~/.local/bin, which cron/systemd PATH lacks.
+        export PATH="$HOME/.local/bin:$PATH"
 
         CLAUDE_BIN="$(command -v claude)"
         if [ -z "$CLAUDE_BIN" ]; then
-            echo "$(date '+%Y-%m-%d %H:%M') START ABORTED: claude not found on PATH (nvm load failed)" | tee -a "$LOG"
+            echo "$(date '+%Y-%m-%d %H:%M') START ABORTED: claude not found on PATH" | tee -a "$LOG"
             exit 1
         fi
         NODE_BIN_DIR="$(dirname "$CLAUDE_BIN")"

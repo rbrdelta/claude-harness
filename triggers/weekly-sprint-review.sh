@@ -37,6 +37,8 @@ export HARNESS_SCHEDULED=1
 
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+# Native installer puts claude in ~/.local/bin, which cron/systemd PATH lacks.
+export PATH="$HOME/.local/bin:$PATH"
 
 if ! command -v claude &>/dev/null; then
     log "FAIL: claude CLI not found"
