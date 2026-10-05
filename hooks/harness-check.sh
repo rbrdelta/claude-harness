@@ -163,6 +163,9 @@ if [ -f "$SYNC_SCRIPT" ] && [ -f "$KEY_FILE" ]; then
     fi
 fi
 
+# --- 6b. One-shot desktop reminders (skips mobile/bridge sessions) ---
+"$(dirname "$(readlink -f "$0")")/desktop-reminders.sh"
+
 # --- 7. Output ---
 if [ -n "$warnings" ]; then
     echo "HARNESS: ${warnings}Run /harness for details."
