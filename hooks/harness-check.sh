@@ -77,6 +77,8 @@ w=$(check_agent_job "NORTHSTAR" "$HOME/.claude/hooks/weekly-northstar-check.log"
 [ -n "$w" ] && warnings="$warnings$w. "
 w=$(check_agent_job "DIGEST" "$HOME/.claude/hooks/weekly-digest.log" 10)
 [ -n "$w" ] && warnings="$warnings$w. "
+w=$(check_agent_job "THOUGHT SCRUB" "$HOME/.claude/hooks/thought-scrub.log" 2)
+[ -n "$w" ] && warnings="$warnings$w. "
 
 # --- 4. Git hygiene: active projects ---
 for dir in ~/projects/active/*/; do

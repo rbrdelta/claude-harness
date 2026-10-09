@@ -1,0 +1,6 @@
+[Unit]
+Description=Daily thought scrub — new writing across sources, ask Daniel via Telegram
+
+[Service]
+Type=oneshot
+ExecStart=/home/rbr01/.claude/hooks/thought-scrub.sh

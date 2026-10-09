@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily thought scrub — 07:00, with catch-up
+
+[Timer]
+OnCalendar=*-*-* 07:00
+Persistent=true
+Unit=thought-scrub.service
+
+[Install]
+WantedBy=timers.target

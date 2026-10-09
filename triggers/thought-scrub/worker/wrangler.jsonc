@@ -1,0 +1,12 @@
+{
+  // Click-tracked redirect for the daily thought-review Telegram ping.
+  // GET /r/<ping_id> logs a click, then redirects to the Notion review list.
+  "name": "thought-link",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-10-01",
+  "account_id": "47c2b77ffaacdc3fd03bf41c8248bd20",
+  "d1_databases": [
+    { "binding": "DB", "database_name": "thought-link", "database_id": "14275d62-4911-45fa-b9da-32caa56f148a" }
+  ],
+  "vars": { "TARGET": "https://app.notion.com/p/3f48b1a8eec581fbbe43ea85720ec902?v=3f48b1a8eec5812187b8000c5954e24a" }
+}
