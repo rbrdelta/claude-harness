@@ -1,0 +1,6 @@
+[Unit]
+Description=Phone notes pull (D1 -> vault Sources/Phone-Notes)
+
+[Service]
+Type=oneshot
+ExecStart=/home/rbr01/.claude/hooks/phone-notes-pull.sh

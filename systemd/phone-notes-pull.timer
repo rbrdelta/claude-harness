@@ -1,0 +1,10 @@
+[Unit]
+Description=Phone notes pull — every 30 min, with catch-up
+
+[Timer]
+OnCalendar=*-*-* *:00/30:00
+Persistent=true
+Unit=phone-notes-pull.service
+
+[Install]
+WantedBy=timers.target
