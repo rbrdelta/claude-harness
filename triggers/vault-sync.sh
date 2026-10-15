@@ -75,9 +75,13 @@ if [ "$SKIP_CLAUDE" = false ]; then
         SUMMARY=$(echo "$OUTPUT" | grep -oP '\{.*\}' | tail -1)
         log "OK: $SUMMARY"
     else
-        if echo "$OUTPUT" | grep -qi "401\|unauthorized\|forbidden\|invalid.*session\|expired"; then
-            log "AUTH_EXPIRED: Session key is no longer valid. Run: claude-sync-key"
-            echo "" > "$KEY_FILE"
+        # The importer tags a dead key as AUTH_EXPIRED; Cloudflare challenges,
+        # timeouts and 5xx are tagged otherwise and must NOT kill the key.
+        # Never blank the key file: a wrongly-classified failure used to turn
+        # a transient block into a multi-day outage.
+        FATAL=$(echo "$OUTPUT" | grep "^Fatal:" | tail -1)
+        if echo "$FATAL" | grep -q "AUTH_EXPIRED"; then
+            log "AUTH_EXPIRED: $FATAL"
             alert "auth_expired" "[harness] Claude.ai session key expired. Refresh: Desktop F12 > Cookies > sessionKey, then write to ~/.claude_session_key"
         else
             log "FAIL (exit $EXIT_CODE): $(echo "$OUTPUT" | tail -3 | tr '\n' ' ')"
