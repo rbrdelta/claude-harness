@@ -51,7 +51,7 @@ if [ "$SKIP_CLAUDE" = false ]; then
     SESSION_KEY=$(cat "$KEY_FILE" | tr -d '[:space:]')
     if [ -z "$SESSION_KEY" ]; then
         log "SKIP: Session key file is empty"
-        alert "key_empty" "[harness] Claude.ai sync key is empty. Refresh: Desktop F12 > Cookies > sessionKey, then write to ~/.claude_session_key"
+        alert "key_empty" "[harness] Claude.ai sync key is empty. Refresh: claude.ai in browser F12 > Cookies > sessionKey, then write to ~/.claude_session_key"
         SKIP_CLAUDE=true
     fi
 fi
@@ -68,8 +68,13 @@ fi
 
 if [ "$SKIP_CLAUDE" = false ]; then
     log "START: Running vault sync..."
-    OUTPUT=$(CLAUDE_SESSION_KEY="$SESSION_KEY" npm run sync 2>&1)
+    OUTPUT=$(CLAUDE_SESSION_KEY="$SESSION_KEY" CLAUDE_SESSION_KEY_FILE="$KEY_FILE" npm run sync 2>&1)
     EXIT_CODE=$?
+
+    # The importer writes a replacement key back to $KEY_FILE when claude.ai
+    # sends one in Set-Cookie. Log it so we can see how often the key rotates.
+    ROTATED=$(echo "$OUTPUT" | grep "KEY_ROTATED" | tail -1)
+    [ -n "$ROTATED" ] && log "KEY_ROTATED: replacement key saved"
 
     if [ $EXIT_CODE -eq 0 ]; then
         SUMMARY=$(echo "$OUTPUT" | grep -oP '\{.*\}' | tail -1)
@@ -82,7 +87,7 @@ if [ "$SKIP_CLAUDE" = false ]; then
         FATAL=$(echo "$OUTPUT" | grep "^Fatal:" | tail -1)
         if echo "$FATAL" | grep -q "AUTH_EXPIRED"; then
             log "AUTH_EXPIRED: $FATAL"
-            alert "auth_expired" "[harness] Claude.ai session key expired. Refresh: Desktop F12 > Cookies > sessionKey, then write to ~/.claude_session_key"
+            alert "auth_expired" "[harness] Claude.ai session key expired. Refresh: claude.ai in browser F12 > Cookies > sessionKey, then write to ~/.claude_session_key"
         else
             log "FAIL (exit $EXIT_CODE): $(echo "$OUTPUT" | tail -3 | tr '\n' ' ')"
             alert "sync_fail" "[harness] Claude.ai sync failed (exit $EXIT_CODE). Check vault-sync.log."
