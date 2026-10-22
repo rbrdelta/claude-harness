@@ -61,7 +61,7 @@ Steps:
 6. \$DS run-mark bookkeeping \"<what you recorded and filed, one line>\".
 7. End your reply with one line: what you recorded, what you filed, what you left for the overnight run."
 else
-MODEL=claude-opus-4-8
+MODEL=opus
 PROMPT="You are Daniel's PM, running the overnight /pm pass, scheduled, with no one at the keyboard. Read ~/.claude/skills/pm/SKILL.md first and follow its 'Scheduled mode' section: Daniel has granted you authority to add, reorder, promote, demote and remove work items. Prioritize ruthlessly, impact first.
 
 $COMMON
