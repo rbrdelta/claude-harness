@@ -17,7 +17,6 @@ Pattern: `claude -p "$PROMPT" --model claude-sonnet-4-6 --allowedTools "Bash,Rea
 
 - `vault-sync.sh` every 8h — Claude.ai conversation sync
 - `notion-sync.sh` every 3h — Notion vault sync
-- `apple-sync.sh` — Apple Notes sync (manual trigger after iPhone Shortcut)
 - `weekly-sprint-review.sh` Fri 10pm — /architect sprint assessment
 - `weekly-northstar-check.sh` Wed 1pm — NorthStar freshness check
 - `weekly-digest.sh` Sun 1pm — Weekly status rollup
@@ -41,11 +40,6 @@ PostStop hook parses JSONL transcripts, writes to:
 - Human log: `/mnt/c/MCP/Meta/Session Log.md` (vault, visible on phone)
 - Analysis: `python3 ~/.claude/hooks/session-stats.py --summary --days N`
 
-## Task System
-
-- Schema: `tasks/SCHEMA.md`
-- Compiler: `compile-task.ts`
-
 ## Key Files
 
 - `~/.claude.json` — trust settings (`hasTrustDialogAccepted` for `/home/rbr01`)
@@ -53,6 +47,6 @@ PostStop hook parses JSONL transcripts, writes to:
 
 ## Standing Rules
 
-- When adding scheduled agent jobs, use local cron + `claude -p`, not RemoteTrigger API
+- When adding scheduled agent jobs, use systemd user timers + `claude -p`, not RemoteTrigger API
 - All triggers must set `WORK_DIR` to the relevant project directory for proper session isolation
 - Never ship detection without remediation — verify the full trigger-detect-act-verify loop

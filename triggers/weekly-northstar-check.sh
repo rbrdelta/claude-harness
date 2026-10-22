@@ -8,7 +8,7 @@ WORK_DIR="$HOME/projects/active/claude-harness"
 
 log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $1" >> "$LOG_FILE"; }
 
-# Headless run: exempt from the july-focus session-open rule (see july-focus.sh)
+# Headless run: SessionStart hooks that assume a human check HARNESS_SCHEDULED
 export HARNESS_SCHEDULED=1
 
 export NVM_DIR="$HOME/.nvm"

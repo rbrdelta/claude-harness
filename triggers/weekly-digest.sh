@@ -8,7 +8,7 @@ WORK_DIR="$HOME/projects/active/claude-harness"
 
 log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $1" >> "$LOG_FILE"; }
 
-# Headless run: exempt from the july-focus session-open rule (see july-focus.sh)
+# Headless run: SessionStart hooks that assume a human check HARNESS_SCHEDULED
 export HARNESS_SCHEDULED=1
 
 export NVM_DIR="$HOME/.nvm"
@@ -68,7 +68,6 @@ echo "$OUTPUT" > "$OUTPUT_FILE"
 # July window-pace gauge (deterministic; self-expires Jul 31). Append the ground-truth
 # window count to the digest note the agent just wrote (if it exists).
 DIGEST_NOTE="/mnt/c/MCP/Inbox/Weekly Digest — $(date +%Y-%m-%d).md"
-"$WORK_DIR/hooks/july-pace-gauge.sh" "$DIGEST_NOTE" 2>/dev/null && log "pace-gauge appended to digest note"
 
 # Standing-advice expiry check (deterministic). Surfaces register rows past their
 # review-by date so standing advice can't outlive its conditions silently.

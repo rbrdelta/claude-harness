@@ -11,7 +11,7 @@
 #   advice-expiry-check.sh                # print overdue advice to stdout
 #   advice-expiry-check.sh <note-path>    # append overdue advice to a note
 #                                         # (weekly-digest.sh passes the digest note,
-#                                         #  same pattern as july-pace-gauge.sh)
+#                                         #  deterministic gauge pattern)
 #
 # Always exits 0 — this is observability, not a gate.
 

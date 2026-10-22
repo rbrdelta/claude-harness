@@ -32,7 +32,7 @@ if [[ "$TODAY" > "2026-06-30" && "$TODAY" < "2026-08-01" ]]; then
     fi
 fi
 
-# Headless run: exempt from the july-focus session-open rule (see july-focus.sh)
+# Headless run: SessionStart hooks that assume a human check HARNESS_SCHEDULED
 export HARNESS_SCHEDULED=1
 
 export NVM_DIR="$HOME/.nvm"
@@ -85,6 +85,15 @@ List which sprints from this week fired a walk-through trigger (drafts >50% over
 
 ### Claude Code usage
 Run `python3 ~/.claude/hooks/session-stats.py --trends-md --months 1` and include its output as a "## Claude Code Usage" section.
+
+### Subtraction candidates (standing section since 2026-10-22)
+Bias to add is the default; this section counters it. List, with the evidence for each, things that may no longer earn their place. Facts only, no verdicts:
+- Skills in ~/.claude/skills with no invocation in the last 30 days (grep session transcripts under ~/.claude/projects for "skill":"<name>" or <command-name>/<name>).
+- Scheduled jobs whose log in ~/.claude/hooks/*.log shows FAIL on every run this week, or OK with nothing done (e.g. 0 imported every day).
+- Hooks in ~/.claude/settings.json whose script is missing, date-expired, or errors in its log.
+- Open work items (node ~/projects/active/daily-standard/scripts/ds.mjs backlog --json) untouched for 21+ days, and the count in now (cap is 3).
+- Memory files in ~/.claude/projects/-home-rbr01/memory/ whose open loop has a past date, or that repeat a rule already in ~/.claude/CLAUDE.md.
+End the section with one open question: "Which of these go, plus one more?"
 
 ## Open questions for Daniel (the actual handoff)
 
