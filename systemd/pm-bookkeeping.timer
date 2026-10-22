@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily Standard bookkeeping run — 12:00 and 18:00, with catch-up
+
+[Timer]
+OnCalendar=*-*-* 12,18:00
+Persistent=true
+Unit=pm-bookkeeping.service
+
+[Install]
+WantedBy=timers.target

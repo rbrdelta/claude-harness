@@ -1,0 +1,6 @@
+[Unit]
+Description=Daily Standard PM run — bookkeeping
+
+[Service]
+Type=oneshot
+ExecStart=/home/rbr01/.claude/hooks/pm-run.sh bookkeeping
