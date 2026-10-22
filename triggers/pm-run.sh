@@ -33,10 +33,12 @@ COMMON="Commands (run them with Bash):
   \$DS pull                      fetch the app's latest completions
   \$DS pending                   completions not yet recorded (key, date, outcome, text, [from: task])
   \$DS backlog --json            every work item: id, text, detail, project, tier, status, order, parent, owner
-  \$DS task-set <id> field=value …   fields: text detail project tier(now|next) owner order status(open|done|dropped|incoming) parent
-  \$DS task-add \"<text>\" --project <p> [--status done] [--tier now|next] [--parent <id>] [--detail d] [--owner o] [--order n]
+  \$DS task-set <id> field=value …   fields: text detail project tier(now|next) owner order status(open|done|dropped|incoming) parent closedBy
+  \$DS task-add \"<text>\" --project <p> [--status done] [--tier now|next] [--parent <id>] [--detail d] [--owner o] [--order n] [--closed-by <completion key>]
   \$DS applied <key> …           mark completions recorded
   \$DS run-mark $KIND \"<one-line summary>\"
+Whenever you mark something done because of a completion, tag it with that completion's key (task-set <id> status=done closedBy=<key>, or task-add ... --closed-by <key>). If Daniel later takes the Done back in the app, pull reopens every task tagged with it automatically.
+UNDONE events mean Daniel took a Done back after it was recorded; pull has already reopened the tagged tasks.
 The database is the source of truth for work items. Never edit the Master Backlog's ds:backlog block by hand.
 Never read anything under /mnt/c/MCP/Confidential/."
 
@@ -50,10 +52,10 @@ Steps:
 1. Run \$DS pull, then \$DS pending and \$DS backlog --json.
 2. For each pending completion with outcome DONE:
    - If it names a task ([from: …] or an exact match), make sure that task is status=done, then mark the key applied.
-   - If it was typed in by hand and clearly belongs to one open item, judge which: if it IS that item, task-set <id> status=done. If it is one piece of that item's work (example: 'Complete Anthropic resume' is part of submitting the applications), record it with task-add \"<text>\" --project <that item's project> --status done --parent <id>. Then mark the key applied.
+   - If it was typed in by hand and clearly belongs to one open item, judge which: if it IS that item, task-set <id> status=done closedBy=<key>. If it is one piece of that item's work (example: 'Complete Anthropic resume' is part of submitting the applications), record it with task-add \"<text>\" --project <that item's project> --status done --parent <id> --closed-by <key>. Then mark the key applied.
    - If it is personal (family, errands) and matches no work item, mark it applied and record nothing.
    - If you are not confident, leave it pending for the overnight run.
-3. Leave SPLIT and MOVED completions pending; the overnight run reads them.
+3. Leave SPLIT and MOVED completions pending; the overnight run reads them. Mark UNDONE events applied.
 4. For each item with status incoming: if its project is obvious from the backlog, task-set <id> status=open tier=next project=<p> order=<one more than the highest order in the backlog>. If not obvious, leave it incoming.
 5. Never change order of existing items, never move items between now and next, never drop anything.
 6. \$DS run-mark bookkeeping \"<what you recorded and filed, one line>\".
@@ -70,7 +72,7 @@ Steps:
 1. Run \$DS pull, \$DS pending, \$DS backlog --json.
 2. Read /mnt/c/MCP/Meta/NorthStar.md and /mnt/c/MCP/Inbox/Master Backlog.md (the Runway Model and current order sit there).
 3. Run python3 $HOME/projects/active/claude-harness/tools/day-digest.py: what Daniel said in the last day's sessions. Any concrete to-do that came up and is not in the backlog gets added (or left incoming if you can't place it). Only work items Daniel would recognize as his or Claude's next actions; not every idea mentioned.
-4. Record every pending completion: DONE ones as in bookkeeping (status=done, or a done child via --parent for a piece of an item's work; personal items need no record). For MOVED: a task moved twice or more needs a decision (shrink it, split it, or drop it); make it and say why. For SPLIT: update the item's detail with what's left if useful. Mark each key applied once handled.
+4. Record every pending completion: DONE ones as in bookkeeping (status=done, or a done child via --parent for a piece of an item's work; personal items need no record). For MOVED: a task moved twice or more needs a decision (shrink it, split it, or drop it); make it and say why. For SPLIT: update the item's detail with what's left if useful. For UNDONE: the tagged tasks are already open again; check the order still makes sense and mention it if anything changes. Mark each key applied once handled.
 5. Place every incoming item: project, tier, order. Or drop it, with a reason.
 6. Re-sort: set order and tier across the whole list so 'now' holds what moves Daniel's top priorities most in the next few days. Drop items that no longer earn a place. Keep Daniel's stated priority order (Master Backlog Now / Next note and NorthStar) unless the record shows it changed.
 7. Run \$DS vault-copy.
