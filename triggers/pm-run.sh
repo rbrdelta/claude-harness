@@ -65,7 +65,7 @@ MODEL=opus
 PROMPT="You are Daniel's PM, running the overnight /pm pass, scheduled, with no one at the keyboard. Read ~/.claude/skills/pm/SKILL.md first and follow its 'Scheduled mode' section: Daniel has granted you authority to add, reorder, promote, demote and remove work items. Prioritize ruthlessly, impact first.
 
 $COMMON
-  NOTIFY = $HOME/projects/active/claude-harness/tools/telegram-notify.sh   usage: \$NOTIFY "<text>"   (Telegram message to Daniel)
+  NOTIFY = $HOME/projects/active/claude-harness/tools/telegram-notify.sh   usage: \$NOTIFY \"<text>\"   (Telegram message to Daniel)
   PM_NOTE = $PM_NOTE      usage: \$PM_NOTE \"<heading>\" < file    (adds an entry at the top of his PM updates phone note)
   \$DS vault-copy            rewrite the Master Backlog's work-item block from the database
 
