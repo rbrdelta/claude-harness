@@ -111,6 +111,13 @@ class Collect(unittest.TestCase):
         _, b = self.bundle()
         self.assertEqual([x["text"] for x in b], ["A second thought appended later, also long enough to count."])
 
+    def test_freshness_reports_days_since_each_source_last_wrote(self):
+        f = scrub.source_freshness()
+        self.assertEqual(set(f), {"iPhone export", "Claude.ai sync", "Notion sync"})
+        self.assertLess(f["Notion sync"], 1)
+        scrub.VAULT = os.path.join(self.d, "empty")
+        self.assertIsNone(scrub.source_freshness()["Notion sync"])
+
     def test_a_vault_under_a_confidential_folder_is_never_read(self):
         conf = os.path.join(self.d, "x", "Confidential", "vault")
         write(f"{conf}/Sources/Notion/secret.md", "A secret thought that is long enough to be collected, normally.")
@@ -131,6 +138,15 @@ class Publish(unittest.TestCase):
 
     def tearDown(self):
         pub.notion, pub.http, pub.secret, pub.PINGS = self.saved
+
+    def test_secrets_are_read_whole_or_by_key(self):
+        pub.secret = self.saved[2]
+        f = os.path.join(self.d, "env")
+        write(f, "A=1\nTOKEN= abc=d \n")
+        self.assertEqual(pub.secret(f, "TOKEN"), "abc=d")
+        self.assertEqual(pub.secret(f), "A=1\nTOKEN= abc=d")
+        with self.assertRaises(SystemExit):
+            pub.secret(f, "MISSING")
 
     def test_text_is_split_into_2000_char_chunks_capped_at_6000(self):
         self.assertEqual([len(c["text"]["content"]) for c in pub.text_prop("x" * 7000)["rich_text"]], [2000, 2000, 2000])

@@ -108,6 +108,25 @@ class Logs(unittest.TestCase):
         ids = [json.loads(l)["session_id"] for l in ss.JSONL_LOG.read_text().splitlines()]
         self.assertEqual(ids, ["abc"])
 
+    def test_summary_and_trends_reports_read_the_machine_log(self):
+        import contextlib, io
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            ss.print_summary(7)
+        self.assertIn("No session log found", buf.getvalue())
+        with contextlib.redirect_stdout(io.StringIO()):
+            ss.log_single_session("abc", None)
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            ss.print_summary(7)
+            ss.print_trends(3)
+        out = buf.getvalue()
+        self.assertIn("=== Last 7 days: 1 sessions ===", out)
+        self.assertIn("xFix the sync", out)
+        self.assertIn("WEEKLY TRENDS", out)
+        self.assertIn("MONTHLY TRENDS", out)
+        self.assertIn("Cache hit rate:", out)
+
 
 if __name__ == "__main__":
     unittest.main()
