@@ -4,8 +4,9 @@
 #   2. the tests in test/ (node:test for shell and JS, unittest for Python), all sandboxed:
 #      temp HOME, shimmed claude/curl/npm, no vault, Notion, Telegram or Daily Standard writes
 #   3. live wiring, read-only: hooks in ~/.claude/settings.json resolve, ~/.claude/hooks symlinks
-#      resolve, systemd units installed and enabled as the repo says, live crontab = crontab.txt
-#   4. live status, informational only (never fails the run): timers and the last log line per job
+#      resolve, systemd units installed and enabled as the repo says, live crontab = crontab.txt,
+#      the thought-link click worker answers (bot user agent, so no click is recorded)
+#   4. live status, informational only (never fails the run): timers, bridge, last log line per job
 # Usage: ./verify.sh          (exit 0 = parts 1-3 all pass)
 cd "$(dirname "$(readlink -f "$0")")" || exit 1
 REPO="$PWD"
@@ -97,6 +98,12 @@ else
   bad "could not read the live crontab"
 fi
 
+# The click-tracking link in the daily thought ping. A bot user agent is used so no click is recorded.
+W=https://thought-link.daily-standard.workers.dev
+[ "$(curl -s --max-time 10 "$W/health")" = ok ] && ok "thought-link worker answers /health" || bad "thought-link worker /health did not answer ok"
+loc=$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' --max-time 10 -A 'TelegramBot (verify)' "$W/r/verify-probe")
+case "$loc" in "302 https://app.notion.com/"*) ok "thought-link /r/<id> redirects to the Notion review list";; *) bad "thought-link /r/<id> gave: $loc";; esac
+
 echo "== 4. Live status (informational)"
 if command -v systemctl >/dev/null && systemctl --user list-timers --no-pager >/dev/null 2>&1; then
   for t in systemd/*.timer; do
@@ -110,6 +117,7 @@ for f in vault-sync notion-sync phone-notes-pull pm-overnight thought-scrub week
   lf="$HOME/.claude/hooks/$f.log"
   [ -f "$lf" ] && info "$f: $(grep -v '^\s*$' "$lf" | tail -1 | cut -c1-140)"
 done
+if tmux has-session -t claude-remote 2>/dev/null && pgrep -f "claude remote-control" >/dev/null; then info "remote-control bridge running"; else info "remote-control bridge DOWN (the 5-minute cron watchdog restarts it)"; fi
 # harness-check.sh itself is not run here: when the Claude.ai sync is stale it starts a real sync.
 
 echo
