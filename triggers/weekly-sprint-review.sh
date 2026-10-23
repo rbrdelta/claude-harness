@@ -33,54 +33,35 @@ PROMPT='You are preparing data for Daniel'\''s weekly retrospective. You are NOT
 - NO Claude-coined framings (no "themes," "buckets," "patterns emerging"). Surface raw signals.
 - Open questions go at the end. Daniel answers them in /retro, not you.
 
-## Task
+## Format (Daniel, 2026-10-23)
+Three parts, in this order, then open questions. Clarity on what we keep, add and remove, and why. Signal over noise: if a part has nothing, say so in one line.
 
-Read the following files from the vault at /mnt/c/MCP:
+Start the doc with one line: days since the last retro. The last retro is the newest `/mnt/c/MCP/Inbox/Retrospective — *.md` file, or the newest work item with id retro-YYYY-MM-DD and status done in `node ~/projects/active/daily-standard/scripts/ds.mjs backlog --json`. Also list any retro-* item marked skipped since then, with its recorded reason.
 
-1. `/mnt/c/MCP/Inbox/Master Backlog.md` — current sprint items + checkbox state
-2. `/mnt/c/MCP/Inbox/PM Decisions — 2026-03-27.md` — prioritization decisions
-3. All sprint contracts and handoffs from the past 7 days: `ls -lt /mnt/c/MCP/Inbox/Sprint* /mnt/c/MCP/Inbox/*Handoff* 2>/dev/null | head -20`
-4. All debriefs from the past 7 days: `ls -lt /mnt/c/MCP/Inbox/Debrief* 2>/dev/null | head -10`
+## 1. Threads to close
+Copy the judge'\''s ranking from `__JUDGE_FILE__` verbatim (it was produced by a separate reviewer from the Notion Thought Review list). Add one line on top: the count of undecided threads and the age of the oldest (`python3 ~/projects/active/claude-harness/triggers/thought-scrub/publish.py stats`). Do not rewrite Daniel'\''s quoted words.
 
-## Surface this data (no interpretation)
+## 2. Build review: __BUILD_NAME__ (`__BUILD_DIR__`)
+Facts only, no verdicts. Gather:
+- Ship date (first deploy or first commit in `git log --reverse`) and the original problem, quoted from its plan, README or project CLAUDE.md.
+- Feature list as it stands (README / plan / code).
+- Changes since ship: `git log --oneline` count, sorted into added, fixed, trimmed (removed) from the commit messages. Pull requests if any (`gh pr list --state all`).
+- Size then vs now: tracked lines of code at the first commit and at HEAD.
+- Evidence of use, from the project'\''s own data where it exists (Daily Standard: completions per week from `ds.mjs pending`/backlog history; Phone Notes: notes pulled into `/mnt/c/MCP/Sources/Phone-Notes/` per week; others: say "no usage data — unknown"). Never estimate usage.
+- Anything built that is not used, and anything trimmed since ship.
+End with these questions for Daniel, unanswered: Does it solve the problem it was built for? Did it grow beyond that, and was the growth warranted? What should be trimmed?
 
-### Sprint items — current checkbox state
-For each item in the 30-day shipping sprint, copy the checkbox line verbatim from the backlog. If a checkbox flipped this week, note the date from the handoff. Do not assess "in progress" vs "not started" — just show the state.
-
-### Sprint metrics from this week
-For each sprint contract found in the past 7 days, extract:
-- Sprint name + date
-- Mode declared (Crystallization/Discovery/Execution) — if field is missing, say "(no mode field)"
-- Predicted drafts/cycles — if missing, say "(not predicted)"
-- Actual drafts/cycles from the matching handoff — if missing, say "(not captured)"
-- Mode match (Yes/No) from handoff — if missing, say "(not captured)"
-- Frame held (Yes/No) from handoff — if missing or N/A, say so
-
-Present this as a table. Don'\''t comment on it.
-
-### Walk-through triggers fired
-List which sprints from this week fired a walk-through trigger (drafts >50% over prediction, mode mismatch, frame did not hold, discovery mode, or "couldn'\''t articulate" flag). Just the list.
-
-### Claude Code usage
-Run `python3 ~/.claude/hooks/session-stats.py --trends-md --months 1` and include its output as a "## Claude Code Usage" section.
-
-### Subtraction candidates (standing section since 2026-10-22)
+## 3. Subtraction candidates
 Bias to add is the default; this section counters it. List, with the evidence for each, things that may no longer earn their place. Facts only, no verdicts:
 - Skills in ~/.claude/skills with no invocation in the last 30 days (grep session transcripts under ~/.claude/projects for "skill":"<name>" or <command-name>/<name>).
 - Scheduled jobs whose log in ~/.claude/hooks/*.log shows FAIL on every run this week, or OK with nothing done (e.g. 0 imported every day).
 - Hooks in ~/.claude/settings.json whose script is missing, date-expired, or errors in its log.
-- Open work items (node ~/projects/active/daily-standard/scripts/ds.mjs backlog --json) untouched for 21+ days, and the count in now (cap is 3).
+- Open work items (ds.mjs backlog --json) untouched for 21+ days, and the count in now (cap is 3).
 - Memory files in ~/.claude/projects/-home-rbr01/memory/ whose open loop has a past date, or that repeat a rule already in ~/.claude/CLAUDE.md.
-End the section with one open question: "Which of these go, plus one more?"
+End the section with: "Which of these go, plus one more?"
 
-## Open questions for Daniel (the actual handoff)
-
-End the prep doc with 3-5 open questions for Daniel to answer in /retro. Examples (do NOT copy verbatim — generate from the actual data):
-- "Sprint X declared Crystallization but mode-match was No. What was the work actually?"
-- "Drafts on Sprint Y exceeded prediction by 80%. Was the frame depth wrong upfront, or did the work shift mid-sprint?"
-- "Three sprints this week skipped the Mode field. Should the contract template enforce it, or is the field optional?"
-
-Questions should target framework adjustment decisions, not status updates.
+## Open questions for Daniel
+3-5 questions drawn only from the three parts above, each pointing at a decision (keep, park, close, trim, promote). No status questions.
 
 ## Output
 
@@ -98,8 +79,24 @@ status: active
 End the file with this exact line:
 `Ready for /retro walk-through. Open questions above.`'
 
-OUTPUT_FILE="$OUTPUT_DIR/sprint-review-$(date +%Y-%m-%d).txt"
+# One shipped build per week, in rotation from the week of 2026-10-25.
+BUILDS=("Daily Standard|$HOME/projects/active/daily-standard" "Phone Notes|$HOME/projects/active/phone-notes" "Claude Harness|$HOME/projects/active/claude-harness" "Prototipo|$HOME/.claude/skills/prototipo" "Sound Lab|$HOME/projects/active/sound-lab" "Partswatch|$HOME/projects/active/partswatch" "rowbyroh-website|$HOME/projects/active/web/rowbyroh-website" "Obsidian MCP|$HOME/projects/active/obsidian-mcp")
+WEEK=$(( ( $(date +%s) - $(date -d 2026-10-25 +%s) ) / 604800 ))
+BUILD="${BUILDS[$(( (WEEK % ${#BUILDS[@]} + ${#BUILDS[@]}) % ${#BUILDS[@]} ))]}"
+
+# The judge: a separate reviewer (Opus) ranks undecided threads, so the prep does not grade its own pile.
 mkdir -p "$OUTPUT_DIR"
+THREADS_FILE="$OUTPUT_DIR/retro-threads-$(date +%Y-%m-%d).json"
+JUDGE_FILE="$OUTPUT_DIR/retro-judge-$(date +%Y-%m-%d).md"
+python3 "$WORK_DIR/triggers/thought-scrub/publish.py" open > "$THREADS_FILE" 2>>"$LOG_FILE" || log "WARN: could not list open threads"
+JUDGE_PROMPT="You are the judge for Daniel's weekly retro. $THREADS_FILE lists his captured thoughts that have no decision yet (thought = his words verbatim, strength, source, created date, Notion url). Judge which are seeds with real potential and which are noise. Write markdown to $JUDGE_FILE with two lists: (1) 'Decide this week': up to 5 threads most worth a keep, park or promote decision, each as: the thought quoted exactly, strength, date, url, and one line on why it matters. (2) 'Probably noise, close in bulk': up to 15, each as the thought quoted exactly, url, and a one-line reason. Leave everything else out. Never paraphrase his words. If the file is empty or missing, write 'No undecided threads.'"
+( cd "$WORK_DIR" && claude -p "$JUDGE_PROMPT" --model opus --allowedTools "Read,Write" --permission-mode bypassPermissions >/dev/null 2>&1 )
+[ -s "$JUDGE_FILE" ] || { echo "Judge did not run this week; see weekly-sprint-review.log." > "$JUDGE_FILE"; log "WARN: judge produced nothing"; }
+PROMPT="${PROMPT//__JUDGE_FILE__/$JUDGE_FILE}"
+PROMPT="${PROMPT//__BUILD_NAME__/${BUILD%%|*}}"
+PROMPT="${PROMPT//__BUILD_DIR__/${BUILD#*|}}"
+
+OUTPUT_FILE="$OUTPUT_DIR/sprint-review-$(date +%Y-%m-%d).txt"
 
 OUTPUT=$(cd "$WORK_DIR" && claude -p "$PROMPT" \
     --model sonnet \

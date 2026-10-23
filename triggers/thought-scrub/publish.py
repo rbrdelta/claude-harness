@@ -5,6 +5,8 @@
   publish.py ping <new_count> [warning ...]   send the Telegram ping with a tracked link
   publish.py clicks                           record clicks on earlier pings
   publish.py stats                            print backlog numbers as JSON
+  publish.py open                             undecided rows, oldest first (threads a retro can close)
+  publish.py decide <page id|url> <Decision> "<why>"   park, close or promote one row, reason written on it
 
 Every call prints one JSON line so run.sh can log it.
 """
@@ -96,6 +98,32 @@ def stats():
     return {"open": len(open_rows), "decided": decided, "oldest_open_days": oldest_days}
 
 
+def open_rows():
+    """Undecided Thought Review rows, oldest first: the threads a retro can close."""
+    out, cursor = [], None
+    while True:
+        body = {"page_size": 100, "filter": {"property": "Decision", "select": {"is_empty": True}},
+                **({"start_cursor": cursor} if cursor else {})}
+        res = notion("POST", f"/v1/databases/{NOTION_DB}/query", body)
+        for p in res["results"]:
+            pr = p["properties"]
+            out.append({"thought": "".join(t["plain_text"] for t in pr["Thought"]["title"]),
+                        "strength": (pr["Strength"]["select"] or {}).get("name"),
+                        "source": (pr["Source"]["select"] or {}).get("name"),
+                        "created": p["created_time"][:10], "url": p["url"]})
+        if not res.get("has_more"):
+            break
+        cursor = res["next_cursor"]
+    return sorted(out, key=lambda r: r["created"])
+
+
+def decide(page, decision, why):
+    """Close, park or promote one thread, with the reason written on the row."""
+    pid = page.rstrip("/").split("/")[-1].split("-")[-1].split("?")[0]
+    notion("PATCH", f"/v1/pages/{pid}", {"properties": {"Decision": {"select": {"name": decision}}, "Why": text_prop(why)}})
+    print(json.dumps({"decided": pid, "decision": decision}))
+
+
 def ping(new_count, warnings):
     s = stats()
     ping_id = datetime.now().strftime("%Y%m%d") + "-" + secrets.token_hex(3)
@@ -142,6 +170,10 @@ if __name__ == "__main__":
         ping(int(sys.argv[2]), sys.argv[3:])
     elif cmd == "clicks":
         clicks()
+    elif cmd == "decide":
+        decide(sys.argv[2], sys.argv[3], sys.argv[4])
+    elif cmd == "open":
+        print(json.dumps(open_rows(), indent=1))
     elif cmd == "stats":
         print(json.dumps(stats()))
     else:
