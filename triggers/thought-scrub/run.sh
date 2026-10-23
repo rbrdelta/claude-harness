@@ -24,6 +24,7 @@ fail() { log "FAIL: $1"; exit 1; }
 # nvm sits below .bashrc's interactive guard, so load it here.
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+export PATH="$HOME/.local/bin:$PATH"
 CLAUDE_BIN=$(command -v claude) || fail "claude binary not found"
 
 log "START$([ $DRY = 1 ] && echo " (dry run)")"
