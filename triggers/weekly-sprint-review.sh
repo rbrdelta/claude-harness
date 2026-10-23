@@ -84,12 +84,25 @@ BUILDS=("Daily Standard|$HOME/projects/active/daily-standard" "Phone Notes|$HOME
 WEEK=$(( ( $(date +%s) - $(date -d 2026-10-25 +%s) ) / 604800 ))
 BUILD="${BUILDS[$(( (WEEK % ${#BUILDS[@]} + ${#BUILDS[@]}) % ${#BUILDS[@]} ))]}"
 
-# The judge: a separate reviewer (Opus) ranks undecided threads, so the prep does not grade its own pile.
+# Build moments: once a week, both sides of the week's sessions, kept only when they clear a strict bar.
+# They land in the same Notion list (Batch "Build moment") so they get decided and closed like Daniel's threads.
 mkdir -p "$OUTPUT_DIR"
+SESSIONS_FILE="$OUTPUT_DIR/retro-sessions-$(date +%Y-%m-%d).md"
+MOMENTS_FILE="$OUTPUT_DIR/retro-moments-$(date +%Y-%m-%d).json"
+python3 "$WORK_DIR/tools/day-digest.py" --hours 168 --both --max-chars 600000 > "$SESSIONS_FILE" 2>>"$LOG_FILE"
+MOMENTS_PROMPT="Read $SESSIONS_FILE in full (page through it with offsets): this week's Claude Code sessions between Daniel and Claude, each line labeled Daniel: or Claude:. Find build moments, and only three kinds count: (1) a result that surprised one of them (a prediction was wrong, a number came back different, something failed in a way nobody expected); (2) a decision whose reason applies beyond its project; (3) a correction, where one of them pushed back and the frame changed. Routine progress, fixes with no surprise, status updates and plans are NOT moments. Drop anything about Daniel's day job (JPMC). Keep at most 8, the strongest only; zero is a fine answer. Write a JSON array to $MOMENTS_FILE, each element: {\"thought\": \"<one plain line naming the moment, max 100 chars>\", \"quote\": \"<2-6 verbatim lines from the file, each kept with its Daniel: or Claude: label, max 1500 chars>\", \"source\": \"Claude Code\", \"where\": \"<project or directory>\", \"written\": \"<YYYY-MM-DD>\", \"strength\": \"Ready\" or \"Seed\" or \"Fragment\", \"flags\": []}. Quote, never paraphrase. Write [] if nothing qualifies."
+( cd "$WORK_DIR" && claude -p "$MOMENTS_PROMPT" --model opus --allowedTools "Read,Write" --permission-mode bypassPermissions >/dev/null 2>&1 )
+if [ -s "$MOMENTS_FILE" ]; then
+    python3 "$WORK_DIR/triggers/thought-scrub/publish.py" rows "$MOMENTS_FILE" "Build moment" >> "$LOG_FILE" 2>&1 || log "WARN: build moments not added to Notion"
+else
+    log "WARN: build-moments pass produced nothing"
+fi
+
+# The judge: a separate reviewer (Opus) ranks undecided threads, so the prep does not grade its own pile.
 THREADS_FILE="$OUTPUT_DIR/retro-threads-$(date +%Y-%m-%d).json"
 JUDGE_FILE="$OUTPUT_DIR/retro-judge-$(date +%Y-%m-%d).md"
 python3 "$WORK_DIR/triggers/thought-scrub/publish.py" open > "$THREADS_FILE" 2>>"$LOG_FILE" || log "WARN: could not list open threads"
-JUDGE_PROMPT="You are the judge for Daniel's weekly retro. $THREADS_FILE lists his captured thoughts that have no decision yet (thought = his words verbatim, strength, source, created date, Notion url). Judge which are seeds with real potential and which are noise. Write markdown to $JUDGE_FILE with two lists: (1) 'Decide this week': up to 5 threads most worth a keep, park or promote decision, each as: the thought quoted exactly, strength, date, url, and one line on why it matters. (2) 'Probably noise, close in bulk': up to 15, each as the thought quoted exactly, url, and a one-line reason. Leave everything else out. Never paraphrase his words. If the file is empty or missing, write 'No undecided threads.'"
+JUDGE_PROMPT="You are the judge for Daniel's weekly retro. Trim hard: he wants signal, not everything. $THREADS_FILE lists undecided threads (thought, strength, source, batch, created date, Notion url). Batch 'Build moment' rows are moments from his sessions with Claude, quoted with Daniel:/Claude: labels; every other batch is Daniel's own words. Judge which are seeds with real potential and which are noise. Write markdown to $JUDGE_FILE with three lists: (1) 'Your threads: decide this week', at most 5 non-Build-moment rows; (2) 'Build moments: decide this week', at most 3 Build moment rows, and after them one line on what this week's build moments reveal, if anything (no line if nothing); (3) 'Probably noise, close in bulk', at most 15 rows of any batch. Each entry: the thought quoted exactly, strength, date, url, and one line on why. Leave everything else out. Never paraphrase his words. If there are no undecided threads, write 'No undecided threads.'"
 ( cd "$WORK_DIR" && claude -p "$JUDGE_PROMPT" --model opus --allowedTools "Read,Write" --permission-mode bypassPermissions >/dev/null 2>&1 )
 [ -s "$JUDGE_FILE" ] || { echo "Judge did not run this week; see weekly-sprint-review.log." > "$JUDGE_FILE"; log "WARN: judge produced nothing"; }
 PROMPT="${PROMPT//__JUDGE_FILE__/$JUDGE_FILE}"

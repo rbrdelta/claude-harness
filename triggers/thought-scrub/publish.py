@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Push candidates to the Notion review list, ping Telegram, track clicks.
 
-  publish.py rows <candidates.json> <batch>   add rows (batch: Daily|Historical)
+  publish.py rows <candidates.json> <batch>   add rows (batch: Daily|Historical|Build moment)
   publish.py ping <new_count> [warning ...]   send the Telegram ping with a tracked link
   publish.py clicks                           record clicks on earlier pings
   publish.py stats                            print backlog numbers as JSON
@@ -110,6 +110,7 @@ def open_rows():
             out.append({"thought": "".join(t["plain_text"] for t in pr["Thought"]["title"]),
                         "strength": (pr["Strength"]["select"] or {}).get("name"),
                         "source": (pr["Source"]["select"] or {}).get("name"),
+                        "batch": (pr["Batch"]["select"] or {}).get("name"),
                         "created": p["created_time"][:10], "url": p["url"]})
         if not res.get("has_more"):
             break
