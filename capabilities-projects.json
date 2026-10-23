@@ -1,0 +1,17 @@
+{
+  "_about": "Where each project's capabilities file lives (hooks/capabilities-gate.py). repo = CAPABILITIES.md in the repo, copied to the vault after each push. vault = public repo, the file lives only in the vault at Sources/Capabilities/<name>.md. exempt = nothing to describe (reason given). A git repo under ~/projects/active/ that is not listed here can't push until it is.",
+  "projects": {
+    "~/projects/active/phone-notes": { "name": "Phone Notes", "where": "repo" },
+    "~/projects/active/daily-standard": { "name": "Daily Standard", "where": "repo" },
+    "~/projects/active/partswatch": { "name": "Partswatch", "where": "repo" },
+    "~/.claude/skills/prototipo": { "name": "Prototipo", "where": "repo", "subdir": true },
+    "~/projects/active/claude-harness": { "name": "Claude Harness", "where": "vault" },
+    "~/projects/active/sound-lab": { "name": "Sound Lab", "where": "vault" },
+    "~/projects/active/web/rowbyroh-website": { "name": "rowbyroh-website", "where": "vault" },
+    "~/projects/active/obsidian-mcp": { "name": "obsidian-mcp", "where": "vault" },
+    "~/projects/active/emotion-research": { "exempt": "research notebook, no app code (the code is sound-lab)" },
+    "~/projects/active/composter-business": { "exempt": "strategy documents, no code" },
+    "~/projects/active/deadweight": { "exempt": "killed April 2026" },
+    "~/projects/active/regex-explain": { "exempt": "finished Prototipo validation build; BRIEF.md describes it" }
+  }
+}
