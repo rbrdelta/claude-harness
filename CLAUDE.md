@@ -11,13 +11,13 @@ Agent harness infrastructure for Daniel's Claude Code setup. Hooks, triggers, sc
 
 Scheduled reasoning jobs run via local cron using `claude -p` — not RemoteTrigger API. Local cron is proven durable. Reserve remote triggers for on-demand/mobile work only.
 
-Pattern: `claude -p "$PROMPT" --model claude-sonnet-4-6 --allowedTools "Bash,Read,Write,Edit,Glob,Grep" --permission-mode bypassPermissions`
+Pattern: `claude -p "$PROMPT" --model sonnet --allowedTools "Bash,Read,Write,Edit,Glob,Grep" --permission-mode bypassPermissions`
 
 ## Cron Jobs
 
 - `vault-sync.sh` every 8h — Claude.ai conversation sync
 - `notion-sync.sh` every 3h — Notion vault sync
-- `weekly-sprint-review.sh` Fri 10pm — /architect sprint assessment
+- `weekly-sprint-review.sh` Sun 18:00 — retro prep doc, then `tools/retro-window.mjs open` puts the retro in Now for Monday-Tuesday; the overnight PM run calls `retro-window.mjs expire`, which marks an unclosed retro skipped with the decisions it left open
 - `weekly-northstar-check.sh` Wed 1pm — NorthStar freshness check
 - `weekly-digest.sh` Sun 1pm — Weekly status rollup
 - `pm-run.sh overnight` 00:00 — Daily Standard PM run (systemd user timer `pm-overnight.timer`, Persistent catch-up). Bookkeeping moved to the cloud 2026-10-22 (scheduled task into a cloud session; instructions in daily-standard `scripts/bookkeeping-prompt.md`); the laptop `pm-bookkeeping` timer is disabled, `pm-run.sh bookkeeping` still works by hand as a fallback. Bookkeeping records completions and files incoming items without reprioritizing (Sonnet); overnight is the full /pm with the vault, re-sorts work items in the Daily Standard database, writes the Master Backlog copy and the "PM updates" Phone Notes entry (Opus). Reads `tools/day-digest.py` for to-dos said in sessions but never captured. Logs `~/.claude/hooks/pm-*.log`; overdue runs flagged by `ds status` and the app's Backlog tab.

@@ -1,8 +1,8 @@
 [Unit]
-Description=Weekly sprint review — Friday 22:00, with catch-up
+Description=Weekly sprint review — Sunday 18:00, with catch-up
 
 [Timer]
-OnCalendar=Fri 22:00
+OnCalendar=Sun 18:00
 Persistent=true
 Unit=weekly-sprint-review.service
 

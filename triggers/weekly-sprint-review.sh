@@ -1,5 +1,6 @@
 #!/bin/bash
-# Weekly Retro Prep — runs via local cron, Fridays at 10pm
+# Weekly Retro Prep — systemd weekly-sprint-review.timer, Sundays 18:00.
+# On success it opens the retro window: the retro holds one Now slot Monday and Tuesday (tools/retro-window.mjs).
 # Outputs a PREP DOC (data + open questions) for Daniel to walk through via /retro.
 # Does NOT produce conclusions or verdicts — those come from the live /retro session.
 
@@ -8,29 +9,6 @@ OUTPUT_DIR="$HOME/.claude/logs"
 WORK_DIR="$HOME/projects/active/claude-harness"
 
 log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $1" >> "$LOG_FILE"; }
-
-# --- July 2026 focus pace nudge (self-expires after 2026-07-31) ---
-# Pushes a Telegram readout of core-window pace vs 4/week. Independent of the
-# retro-prep run below; no-op outside the July focus window.
-TODAY=$(date +%Y-%m-%d)
-if [[ "$TODAY" > "2026-06-30" && "$TODAY" < "2026-08-01" ]]; then
-    CHARTER="/mnt/c/MCP/Inbox/July 2026 Charter — Research PM, All-In.md"
-    if [ -f "$CHARTER" ]; then
-        dow=$(date +%u)
-        WK=$(date -d "-$((dow-1)) days" +%Y-%m-%d)
-        N=$(grep -oE '^\| 2026-[0-9]{2}-[0-9]{2} ' "$CHARTER" 2>/dev/null \
-            | tr -d '| ' | awk -v w="$WK" '$1 >= w' | wc -l | tr -d ' ')
-        TG_TOKEN="$(grep TELEGRAM_BOT_TOKEN "$HOME/.claude/channels/telegram/.env" 2>/dev/null | cut -d= -f2)"
-        TG_CHAT_ID="8691823610"
-        if [ -n "$TG_TOKEN" ]; then
-            if [ "$N" -lt 4 ]; then PACE="Behind pace — $((4-N)) to go this week."; else PACE="On pace."; fi
-            MSG="[July Focus] Core windows this week: ${N}/4. ${PACE} Spine: Shadow Ledger strain arc + Anticipation Prototype."
-            curl -s -o /dev/null "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
-                -d "chat_id=${TG_CHAT_ID}" -d "text=${MSG}"
-            log "July focus nudge sent: ${N}/4"
-        fi
-    fi
-fi
 
 # Headless run: SessionStart hooks that assume a human check HARNESS_SCHEDULED
 export HARNESS_SCHEDULED=1
@@ -124,7 +102,7 @@ OUTPUT_FILE="$OUTPUT_DIR/sprint-review-$(date +%Y-%m-%d).txt"
 mkdir -p "$OUTPUT_DIR"
 
 OUTPUT=$(cd "$WORK_DIR" && claude -p "$PROMPT" \
-    --model claude-sonnet-4-6 \
+    --model sonnet \
     --allowedTools "Bash,Read,Write,Edit,Glob,Grep" \
     --permission-mode bypassPermissions \
     2>&1)
@@ -137,6 +115,7 @@ echo "$OUTPUT" > "$OUTPUT_FILE"
 PREP_FILE="/mnt/c/MCP/Inbox/Retro Prep — $(date +%Y-%m-%d).md"
 if [ $EXIT_CODE -eq 0 ] && [ -f "$PREP_FILE" ]; then
     log "OK: prep doc written to $PREP_FILE — run /retro to walk through"
+    node "$WORK_DIR/tools/retro-window.mjs" open >> "$LOG_FILE" 2>&1 || log "FAIL: retro-window open"
 else
     log "FAIL (exit $EXIT_CODE): no prep doc dated today. Output tail: $(echo "$OUTPUT" | tail -3 | tr '\n' ' ')"
 fi
