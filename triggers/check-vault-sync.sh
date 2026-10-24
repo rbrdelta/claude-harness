@@ -1,7 +1,6 @@
 #!/bin/bash
 # Session-start check: are all vault sync sources healthy?
-# Checks Claude.ai and Notion sync logs. (Apple Notes is retired; Phone Notes
-# has its own check, phone-notes-check.sh.)
+# Checks Claude.ai and Notion sync logs. (Apple Notes is retired and archived.)
 
 check_source() {
     local name="$1"

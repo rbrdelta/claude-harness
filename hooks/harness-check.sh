@@ -35,8 +35,7 @@ w=$(check_sync_source "CLAUDE.AI SYNC" "$HOME/.claude/hooks/vault-sync.log" 24)
 [ -n "$w" ] && warnings="$warnings$w. "
 w=$(check_sync_source "NOTION SYNC" "$HOME/.claude/hooks/notion-sync.log" 48)
 [ -n "$w" ] && warnings="$warnings$w. "
-# Apple Notes (iPhone Shortcut export) is retired: phone capture now goes
-# through Phone Notes, whose pull has its own session-start check.
+# Apple Notes (iPhone Shortcut export) is retired and archived: no check.
 
 # --- 3. Weekly agent jobs ---
 check_agent_job() {
