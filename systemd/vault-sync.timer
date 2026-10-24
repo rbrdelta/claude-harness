@@ -1,5 +1,5 @@
 [Unit]
-Description=Vault sync (Claude.ai + Apple Notes) — every 8h, with catch-up
+Description=Vault sync (Claude.ai) — every 8h, with catch-up
 
 [Timer]
 OnCalendar=*-*-* 00/8:00:00

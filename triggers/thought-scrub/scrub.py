@@ -88,7 +88,7 @@ def vault_docs():
             yield path, source, os.path.basename(path)[:-3], written, body
 
     yield from notes("Sources/Notion/*.md", "Notion")
-    yield from notes("Sources/Apple-Notes/*.md", "iPhone")
+    yield from notes("Sources/Apple-Notes/*.md", "iPhone")  # archive, retired 2026-10
     yield from notes("Sources/Claude-Conversations/*.md", "Claude.ai")
     # Obsidian: only notes Daniel writes directly (vault root). Inbox is
     # mostly Claude-written and is deliberately excluded.
@@ -182,7 +182,6 @@ def source_freshness():
         files = glob.glob(pattern)
         return (now - max(os.path.getmtime(f) for f in files)) / 86400 if files else None
     return {
-        "iPhone export": newest("/mnt/c/Users/deero/iCloudDrive/NotesExport/*"),
         "Claude.ai sync": newest(os.path.join(VAULT, "Sources/Claude-Conversations/*.md")),
         "Notion sync": newest(os.path.join(VAULT, "Sources/Notion/*.md")),
     }

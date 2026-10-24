@@ -1,6 +1,7 @@
 #!/bin/bash
 # Session-start check: are all vault sync sources healthy?
-# Checks Claude.ai, Notion, and Apple Notes sync logs.
+# Checks Claude.ai and Notion sync logs. (Apple Notes is retired; Phone Notes
+# has its own check, phone-notes-check.sh.)
 
 check_source() {
     local name="$1"
@@ -45,10 +46,6 @@ w=$(check_source "CLAUDE.AI SYNC" "$HOME/.claude/hooks/vault-sync.log" 24)
 
 # Notion — cron daily, stale after 48h
 w=$(check_source "NOTION SYNC" "$HOME/.claude/hooks/notion-sync.log" 48)
-[ -n "$w" ] && warnings="$warnings$w. "
-
-# Apple Notes — manual, stale after 7 days
-w=$(check_source "APPLE NOTES" "$HOME/.claude/hooks/apple-sync.log" 168)
 [ -n "$w" ] && warnings="$warnings$w. "
 
 # Check cron service

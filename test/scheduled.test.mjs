@@ -197,12 +197,12 @@ test('weekly-sprint-review: no prep doc dated today is a FAIL and the retro wind
 });
 
 // --- Daily thought scrub ------------------------------------------------------------------------
-function scrub(sb, { newItems = 0, apple = 1 } = {}) {
+function scrub(sb, { newItems = 0 } = {}) {
   sb.write('ts/scrub.py', `import sys,os,json
 open(os.environ["SHIM_LOG"],"a").write("scrub "+" ".join(sys.argv[1:])+"\\n")
 c=sys.argv[1]
 if c=="collect": open(sys.argv[2],"w").write("[]"); print(json.dumps({"changed":${newItems},"new_items":${newItems}}))
-elif c=="freshness": print(json.dumps({"iPhone export": ${apple === null ? 'None' : apple}}))`);
+elif c=="freshness": print(json.dumps({"Notion sync": 1}))`);
   sb.write('ts/publish.py', `import sys,os,json
 open(os.environ["SHIM_LOG"],"a").write("publish "+" ".join(sys.argv[1:])+"\\n")
 print(json.dumps({"open": 4} if sys.argv[1]=="stats" else {"ok": 1}))`);
@@ -267,12 +267,12 @@ test('thought-scrub: a screen that writes no valid JSON fails the run before sna
 
 test('thought-scrub: a broken source with no new thoughts pings at most once a week', () => {
   const sb = base();
-  const s = scrub(sb, { apple: 20 });
+  const s = scrub(sb);
   sb.write('.claude/hooks/vault-sync.log', '2026-10-01 00:00:00 AUTH_EXPIRED: x\n');
   sb.run('bash', [s]);
   const p = sb.calls().filter((c) => c.startsWith('publish ping'));
   assert.equal(p.length, 1);
-  assert.match(p[0], /^publish ping 0 iPhone notes: last export 20 days ago, run the Shortcut\. Claude\.ai sync is not running/);
+  assert.match(p[0], /^publish ping 0 Claude\.ai sync is not running/);
   sb.write('.claude/thought-scrub/pings.jsonl', JSON.stringify({ sent_at: new Date().toISOString() }) + '\n');
   sb.run('bash', [s]);
   assert.equal(sb.calls().filter((c) => c.startsWith('publish ping')).length, 1, 'pinged under 7 days ago: quiet');
@@ -284,6 +284,6 @@ test('thought-scrub: a broken source with no new thoughts pings at most once a w
 test('thought-scrub: healthy sources and nothing new stay silent', () => {
   const sb = base();
   sb.write('.claude/hooks/vault-sync.log', '2026-10-01 00:00:00 OK: {}\n');
-  sb.run('bash', [scrub(sb, { apple: 2 })]);
+  sb.run('bash', [scrub(sb)]);
   assert.equal(sb.calls().filter((c) => c.startsWith('publish ping')).length, 0);
 });

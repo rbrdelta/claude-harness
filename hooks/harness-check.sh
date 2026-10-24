@@ -35,24 +35,8 @@ w=$(check_sync_source "CLAUDE.AI SYNC" "$HOME/.claude/hooks/vault-sync.log" 24)
 [ -n "$w" ] && warnings="$warnings$w. "
 w=$(check_sync_source "NOTION SYNC" "$HOME/.claude/hooks/notion-sync.log" 48)
 [ -n "$w" ] && warnings="$warnings$w. "
-w=$(check_sync_source "APPLE NOTES" "$HOME/.claude/hooks/apple-sync.log" 168)
-[ -n "$w" ] && warnings="$warnings$w. "
-
-# Apple Notes import runs fine on an old export and still logs OK, so also
-# check the export itself: the newest file in the iCloud folder is the last
-# time Daniel ran the iPhone Shortcut.
-APPLE_EXPORT_DIR="/mnt/c/Users/deero/iCloudDrive/NotesExport"
-APPLE_EXPORT_STALE_DAYS=14
-if [ -d "$APPLE_EXPORT_DIR" ]; then
-    newest=$(stat -c %Y "$APPLE_EXPORT_DIR"/* 2>/dev/null | sort -n | tail -1)
-    if [ -n "$newest" ]; then
-        export_age_days=$(( ($(date +%s) - newest) / 86400 ))
-        [ "$export_age_days" -ge "$APPLE_EXPORT_STALE_DAYS" ] && \
-            warnings="${warnings}APPLE NOTES: NO NEW IPHONE EXPORT IN ${export_age_days}d, RUN THE SHORTCUT. "
-    fi
-else
-    warnings="${warnings}APPLE NOTES: EXPORT FOLDER MISSING. "
-fi
+# Apple Notes (iPhone Shortcut export) is retired: phone capture now goes
+# through Phone Notes, whose pull has its own session-start check.
 
 # --- 3. Weekly agent jobs ---
 check_agent_job() {

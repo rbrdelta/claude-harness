@@ -1,5 +1,5 @@
 [Unit]
-Description=Vault sync (Claude.ai + Apple Notes)
+Description=Vault sync (Claude.ai)
 
 [Service]
 Type=oneshot

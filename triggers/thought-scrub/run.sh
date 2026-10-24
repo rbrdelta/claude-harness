@@ -55,8 +55,6 @@ log "candidates: $CAND_COUNT from $NEW_ITEMS new items"
 
 # Source health: a broken sync looks exactly like "nothing new".
 WARNINGS=()
-APPLE_AGE=$(python3 "$DIR/scrub.py" freshness | python3 -c "import json,sys; v=json.load(sys.stdin)['iPhone export']; print(int(v) if v is not None else 999)")
-[ "$APPLE_AGE" -ge 14 ] && WARNINGS+=("iPhone notes: last export ${APPLE_AGE} days ago, run the Shortcut.")
 tail -1 "$HOME/.claude/hooks/vault-sync.log" 2>/dev/null | grep -qE "FAIL|AUTH_EXPIRED|SKIP.*empty" \
     && WARNINGS+=("Claude.ai sync is not running (session key). Web conversations are not being read.")
 

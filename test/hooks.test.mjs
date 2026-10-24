@@ -71,7 +71,7 @@ test('harness-check: sync logs — no log, stale, failing, auth expired and empt
   assert.match(r.out, /^HARNESS: .*Run \/harness for details\./);
   assert.match(r.out, /CLAUDE\.AI SYNC: STALE \(30h\)/);
   assert.match(r.out, /NOTION SYNC: AUTH EXPIRED \(2h\)/);
-  assert.match(r.out, /APPLE NOTES: NO LOG/);
+  assert.doesNotMatch(r.out, /APPLE NOTES/, 'Apple Notes is retired: no warning');
 
   const sb2 = sandbox();
   sb2.write('.claude/hooks/vault-sync.log', `${stamp(3)} OK: {}\n${stamp(1)} FAIL (exit 1): boom\n`);

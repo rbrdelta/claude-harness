@@ -113,7 +113,7 @@ class Collect(unittest.TestCase):
 
     def test_freshness_reports_days_since_each_source_last_wrote(self):
         f = scrub.source_freshness()
-        self.assertEqual(set(f), {"iPhone export", "Claude.ai sync", "Notion sync"})
+        self.assertEqual(set(f), {"Claude.ai sync", "Notion sync"})
         self.assertLess(f["Notion sync"], 1)
         scrub.VAULT = os.path.join(self.d, "empty")
         self.assertIsNone(scrub.source_freshness()["Notion sync"])
