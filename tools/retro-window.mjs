@@ -46,7 +46,10 @@ if (cmd === 'open') {
   const mon = ymd(d);
   const key = `retro-${mon}`;
   const all = items();
-  if (all.some((t) => t.id === key)) { log(`open: ${key} already exists`); process.exit(0); }
+  const existing = all.find((t) => t.id === key);
+  // Already in Now (or closed): nothing to do. Sitting in Next (moved there before the window opened,
+  // as on 2026-10-23): promote it below instead of leaving it out of Now.
+  if (existing && (existing.status !== 'open' || existing.tier !== 'next')) { log(`open: ${key} already exists`); process.exit(0); }
   const nows = all.filter((t) => t.status === 'open' && t.tier !== 'next' && !t.parent).sort((a, b) => (a.order ?? 1e9) - (b.order ?? 1e9));
   let moved = '';
   if (nows.length >= NOW_CAP) {
@@ -56,9 +59,10 @@ if (cmd === 'open') {
   }
   const tue = new Date(d); tue.setDate(d.getDate() + 1);
   const prep = latestPrep();
-  ds('task-add', `Retro — week of ${pretty(mon)}`, '--project', 'Harness', '--tier', 'now', '--key', key, '--order', '-1', '--owner', 'Both',
-    '--detail', `Window: Monday ${pretty(mon)} through Tuesday ${pretty(ymd(tue))}. Run /retro with Claude. Prep: ${prep ? prep.split('/').pop() : 'missing'}. If it is not closed by the end of Tuesday it is marked skipped, with the decisions it left open.`);
-  log(`open: added ${key}${moved}`);
+  const detail = `Window: Monday ${pretty(mon)} through Tuesday ${pretty(ymd(tue))}. Run /retro with Claude. Prep: ${prep ? prep.split('/').pop() : 'missing'}. If it is not closed by the end of Tuesday it is marked skipped, with the decisions it left open.`;
+  if (existing) ds('task-set', key, 'tier=now', 'order=-1', `detail=${detail}`);
+  else ds('task-add', `Retro — week of ${pretty(mon)}`, '--project', 'Harness', '--tier', 'now', '--key', key, '--order', '-1', '--owner', 'Both', '--detail', detail);
+  log(`open: ${existing ? 'promoted' : 'added'} ${key}${moved}`);
   notify(`Retro prep is ready. "Retro — week of ${pretty(mon)}" holds a Now slot Monday and Tuesday.${moved}`);
 } else if (cmd === 'expire') {
   for (const t of items().filter((x) => /^retro-\d{4}-\d{2}-\d{2}$/.test(x.id) && x.status === 'open')) {

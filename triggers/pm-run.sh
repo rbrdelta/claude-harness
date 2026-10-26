@@ -2,7 +2,8 @@
 # Daily Standard PM runs — headless claude -p on the laptop, scheduled by systemd user timers
 # (Persistent=true, so a run missed while the laptop slept fires when it wakes).
 #   pm-run.sh bookkeeping   noon and 6pm: record completions, file incoming items. Never reprioritizes.
-#   pm-run.sh overnight     midnight: the full /pm with the vault; reprioritizes and writes the PM updates note.
+#   pm-run.sh overnight     every 6 hours (00, 06, 12, 18; Daniel 2026-10-26): the full /pm with the vault;
+#                           reprioritizes and writes the PM updates note. The name is kept so logs and ds status still match.
 # Plan: ~/projects/active/daily-standard/notes/plan-dynamic-backlog.md
 # Failure shows up three ways: this log, `ds status` at session start, and the Backlog tab's overdue line.
 
@@ -62,7 +63,7 @@ Steps:
 7. End your reply with one line: what you recorded, what you filed, what you left for the overnight run."
 else
 MODEL=opus
-PROMPT="You are Daniel's PM, running the overnight /pm pass, scheduled, with no one at the keyboard. Read ~/.claude/skills/pm/SKILL.md first and follow its 'Scheduled mode' section: Daniel has granted you authority to add, reorder, promote, demote and remove work items. Prioritize ruthlessly, impact first.
+PROMPT="You are Daniel's PM, running the scheduled /pm pass (every 6 hours), scheduled, with no one at the keyboard. Read ~/.claude/skills/pm/SKILL.md first and follow its 'Scheduled mode' section: Daniel has granted you authority to add, reorder, promote, demote and remove work items. Prioritize ruthlessly, impact first.
 
 $COMMON
   NOTIFY = $HOME/projects/active/claude-harness/tools/telegram-notify.sh   usage: \$NOTIFY \"<text>\"   (Telegram message to Daniel)
@@ -78,7 +79,7 @@ Steps:
 6. Re-sort: set order and tier across the whole list so 'now' holds what moves Daniel's top priorities most in the next few days. Drop items that no longer earn a place. Keep Daniel's stated priority order (Master Backlog Now / Next note and NorthStar) unless the record shows it changed.
    NOW CAP: at most 3 open items in now (Daniel, 2026-10-22: stop starting, start finishing). ds refuses a fourth, so demote before you promote. Nothing enters now unless something leaves it. If you cannot tell which of two items should hold a slot (a genuine tie on impact, not a dependency you can read), keep the current now items unchanged and message him: \$NOTIFY \"PM tie: <item A> vs <item B> for the last Now slot. A because ... B because ... Reply in a session with your pick.\" Also list it under Needs you. Items whose id starts with retro- belong to the weekly retro window (tools/retro-window.mjs): never demote, reorder or drop them; they count toward the 3.
 7. Run \$DS vault-copy.
-8. Write the PM updates entry to a temp file, then run \$PM_NOTE \"\$(date +%Y-%m-%d) ($(date +%a))\" < that file. Plain language, short lines, no shorthand or codes. Sections, each only if non-empty: Moved, Added, Removed, Recorded done, Needs you. Each item gets a one-line why. If nothing changed, one line saying so.
+8. Write the PM updates entry to a temp file, then run \$PM_NOTE \"\$(date +%Y-%m-%d) ($(date +%a))\" < that file. Plain language, short lines, no shorthand or codes. Sections, each only if non-empty: Moved, Added, Removed, Recorded done, Needs you. Each item gets a one-line why. If nothing changed, skip this step: no entry (runs are every 6 hours, and empty entries bury the real ones).
 9. \$DS run-mark overnight \"<one line>\".
 10. End your reply with the same one line."
 fi

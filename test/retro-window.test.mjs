@@ -68,6 +68,19 @@ test('retro-window open: is idempotent — a second run adds nothing and sends n
   assert.match(sb.read('retro.log'), /already exists/);
 });
 
+test('retro-window open: a retro already added but moved to Next goes back to Now, making room (2026-10-23 miss)', () => {
+  const key = `retro-${comingMonday()}`;
+  const sb = setup([now('a', 1), now('b', 2), now('c', 3), { id: key, text: 'Retro — week of x', status: 'open', tier: 'next', order: -1, detail: 'scheduled slot, not a Now item' }]);
+  sb.retro('open');
+  const it = sb.items();
+  const r = it.find((t) => t.id === key);
+  assert.equal(r.tier, 'now'); assert.match(r.detail, /^Window: Monday /);
+  assert.equal(it.filter((t) => t.id === key).length, 1, 'no duplicate added');
+  assert.equal(it.find((t) => t.id === 'c').tier, 'next');
+  assert.match(sb.read('retro.log'), /open: promoted retro-/);
+  assert.equal(sb.notes().length, 1);
+});
+
 test('retro-window open: a missing prep doc is named in the detail as missing', () => {
   const sb = setup([]);
   sb.retro('open');

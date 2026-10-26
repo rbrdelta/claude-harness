@@ -1,8 +1,8 @@
 [Unit]
-Description=Daily Standard overnight PM run — 00:00, with catch-up
+Description=Daily Standard full PM run — every 6 hours (00, 06, 12, 18), with catch-up
 
 [Timer]
-OnCalendar=*-*-* 00:00
+OnCalendar=*-*-* 00/6:00
 Persistent=true
 Unit=pm-overnight.service
 
