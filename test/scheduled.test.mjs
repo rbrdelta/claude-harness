@@ -287,3 +287,40 @@ test('thought-scrub: healthy sources and nothing new stay silent', () => {
   sb.run('bash', [scrub(sb)]);
   assert.equal(sb.calls().filter((c) => c.startsWith('publish ping')).length, 0);
 });
+
+// --- Job search: weekly scan (no model) and monthly news (claude -p) -----------------------------
+test('job-scan: runs job_scan.py in the job-search folder, logs its last line as OK, FAIL with the exit code otherwise, no model call', () => {
+  const sb = base();
+  const dir = sb.path('jobsearch');
+  sb.write('jobsearch/job_scan.py', 'import os,sys\nprint("scanning")\nprint("new=2 closed=1 unreadable=0 manual=1 current=9")\nsys.exit(int(os.environ.get("FAKE_SCAN_EXIT","0")))');
+  const s = sb.copyScript('triggers/job-scan.sh', 'bin/job-scan.sh');
+  sb.run('bash', [s], { env: { JOB_SEARCH_DIR: dir } });
+  assert.match(log(sb, 'job-scan'), /START\n.*OK: new=2 closed=1 unreadable=0 manual=1 current=9\n$/);
+  assert.equal(sb.claudeCalls().length, 0);
+  const r = sb.run('bash', [s], { env: { JOB_SEARCH_DIR: dir, FAKE_SCAN_EXIT: '1' } });
+  assert.equal(r.code, 1);
+  assert.match(log(sb, 'job-scan'), /FAIL \(exit 1\): new=2/);
+  sb.run('bash', [s], { env: { JOB_SEARCH_DIR: sb.path('nowhere') } });
+  assert.match(log(sb, 'job-scan'), /FAIL: .*job_scan\.py missing/);
+});
+
+test('job-news: Opus with web search, prompt forbids Excel writes and Confidential; OK only when this month\'s note exists', () => {
+  const sb = base();
+  const dir = sb.path('jobsearch');
+  sb.write('jobsearch/.keep', '');
+  const s = sb.copyScript('triggers/job-news.sh', 'bin/job-news.sh');
+  sb.run('bash', [s], { env: { JOB_SEARCH_DIR: dir } });
+  assert.match(log(sb, 'job-news'), /FAIL: run finished but .*Company and thesis news — \d{4}-\d{2}\.md was not written/);
+  const [p] = sb.prompts();
+  assert.match(p, /Never write or edit the Excel tracker/);
+  assert.match(p, /never read anything under \/mnt\/c\/MCP\/Confidential\//);
+  assert.match(p, /labeled Connect/);
+  const call = sb.claudeCalls()[0];
+  assert.ok(call.includes('[--model] [opus]'));
+  assert.ok(call.includes('WebSearch,WebFetch'));
+  sb.write('claude-behavior.sh', `touch "${dir}/Company and thesis news — $(date +%Y-%m).md"`);
+  sb.run('bash', [s], { env: { JOB_SEARCH_DIR: dir } });
+  assert.match(log(sb, 'job-news'), /OK: final summary\n$/);
+  sb.run('bash', [s], { env: { JOB_SEARCH_DIR: dir, FAKE_CLAUDE_EXIT: '1' } });
+  assert.match(log(sb, 'job-news'), /FAIL \(exit 1\)/);
+});

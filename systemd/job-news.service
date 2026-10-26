@@ -1,0 +1,6 @@
+[Unit]
+Description=Monthly company and thesis news (claude -p)
+
+[Service]
+Type=oneshot
+ExecStart=/home/rbr01/.claude/hooks/job-news.sh

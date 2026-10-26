@@ -62,6 +62,24 @@ w=$(check_agent_job "DIGEST" "$HOME/.claude/hooks/weekly-digest.log" 10)
 [ -n "$w" ] && warnings="$warnings$w. "
 w=$(check_agent_job "THOUGHT SCRUB" "$HOME/.claude/hooks/thought-scrub.log" 2)
 [ -n "$w" ] && warnings="$warnings$w. "
+w=$(check_agent_job "JOB SCAN" "$HOME/.claude/hooks/job-scan.log" 9)
+[ -n "$w" ] && warnings="$warnings$w. "
+w=$(check_agent_job "JOB NEWS" "$HOME/.claude/hooks/job-news.log" 38)
+[ -n "$w" ] && warnings="$warnings$w. "
+
+# --- 3b. Job scan results: name new / closed postings for 3 days after a scan ---
+JOB_SCAN_LOG="$HOME/.claude/hooks/job-scan.log"
+if [ -f "$JOB_SCAN_LOG" ]; then
+    js_line=$(grep " OK: new=" "$JOB_SCAN_LOG" | tail -1)
+    if [ -n "$js_line" ]; then
+        js_age=$(( ($(date +%s) - $(date -d "$(echo "$js_line" | cut -d' ' -f1-2)" +%s)) / 86400 ))
+        js_new=$(echo "$js_line" | sed -E 's/.*new=([0-9]+).*/\1/')
+        js_closed=$(echo "$js_line" | sed -E 's/.*closed=([0-9]+).*/\1/')
+        if [ "$js_age" -lt 3 ] && [ $((js_new + js_closed)) -gt 0 ]; then
+            warnings="${warnings}JOB SCAN: ${js_new} new opening(s), ${js_closed} Pipeline posting(s) closed — vault: job search/2026 ai pm/Job scan — weekly.md. "
+        fi
+    fi
+fi
 
 # --- 4. Git hygiene: active projects ---
 for dir in ~/projects/active/*/; do

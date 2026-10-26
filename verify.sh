@@ -113,7 +113,7 @@ if command -v systemctl >/dev/null && systemctl --user list-timers --no-pager >/
 else
   info "systemctl --user not reachable from this shell"
 fi
-for f in vault-sync notion-sync phone-notes-pull pm-overnight thought-scrub weekly-sprint-review weekly-digest weekly-northstar-check vault-reclassify retro-window; do
+for f in vault-sync notion-sync phone-notes-pull pm-overnight thought-scrub weekly-sprint-review weekly-digest weekly-northstar-check vault-reclassify retro-window job-scan job-news; do
   lf="$HOME/.claude/hooks/$f.log"
   [ -f "$lf" ] && info "$f: $(grep -v '^\s*$' "$lf" | tail -1 | cut -c1-140)"
 done

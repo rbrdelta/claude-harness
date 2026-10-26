@@ -400,3 +400,20 @@ test('remote-control.sh: start is idempotent, starts claude remote-control in tm
   assert.equal(abort.code, 1);
   assert.match(abort.out, /START ABORTED: claude not found on PATH/);
 });
+
+test('harness-check: job scan — names new/closed postings for 3 days, silent when nothing changed or the scan is old; stale and failed are named', () => {
+  let sb = sandbox();
+  sb.write('.claude/hooks/job-scan.log', `${stamp(5)} OK: new=2 closed=1 unreadable=0 manual=1 current=9\n`);
+  assert.match(harness(sb).out, /JOB SCAN: 2 new opening\(s\), 1 Pipeline posting\(s\) closed — vault: job search\/2026 ai pm\/Job scan — weekly\.md/);
+  sb = sandbox();
+  sb.write('.claude/hooks/job-scan.log', `${stamp(5)} OK: new=0 closed=0 unreadable=0 manual=1 current=9\n`);
+  assert.doesNotMatch(harness(sb).out, /JOB SCAN/);
+  sb = sandbox();
+  sb.write('.claude/hooks/job-scan.log', `${stamp(24 * 10)} OK: new=4 closed=0 unreadable=0 manual=1 current=9\n`);
+  const r = harness(sb).out;
+  assert.match(r, /JOB SCAN: STALE \(10d\)/);
+  assert.doesNotMatch(r, /new opening/);
+  sb = sandbox();
+  sb.write('.claude/hooks/job-news.log', `${stamp(24 * 3)} OK: 12\n${stamp(1)} FAIL: run finished but note was not written\n`);
+  assert.match(harness(sb).out, /JOB NEWS: LAST RUN FAILED/);
+});

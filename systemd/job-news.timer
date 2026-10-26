@@ -1,0 +1,10 @@
+[Unit]
+Description=Monthly company and thesis news — first Monday 08:00, with catch-up
+
+[Timer]
+OnCalendar=Mon *-*-01..07 08:00
+Persistent=true
+Unit=job-news.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,6 @@
+[Unit]
+Description=Weekly job scan (hiring boards for tracked companies)
+
+[Service]
+Type=oneshot
+ExecStart=/home/rbr01/.claude/hooks/job-scan.sh

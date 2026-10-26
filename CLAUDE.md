@@ -21,6 +21,8 @@ Pattern: `claude -p "$PROMPT" --model sonnet --allowedTools "Bash,Read,Write,Edi
 - `weekly-northstar-check.sh` Wed 1pm — NorthStar freshness check
 - `weekly-digest.sh` Sun 1pm — Weekly status rollup
 - `pm-run.sh overnight` 00:00 — Daily Standard PM run (systemd user timer `pm-overnight.timer`, Persistent catch-up). Bookkeeping moved to the cloud 2026-10-22 (scheduled task into a cloud session; instructions in daily-standard `scripts/bookkeeping-prompt.md`); the laptop `pm-bookkeeping` timer is disabled, `pm-run.sh bookkeeping` still works by hand as a fallback. Bookkeeping records completions and files incoming items without reprioritizing (Sonnet); overnight is the full /pm with the vault, re-sorts work items in the Daily Standard database, writes the Master Backlog copy and the "PM updates" Phone Notes entry (Opus). Reads `tools/day-digest.py` for to-dos said in sessions but never captured. Logs `~/.claude/hooks/pm-*.log`; overdue runs flagged by `ds status` and the app's Backlog tab.
+- `job-scan.sh` Mon 07:00 — job search postings scan, no model (systemd `job-scan.timer`, Persistent). Runs `job_scan.py` in the vault job-search folder; writes the vault note `job search/2026 ai pm/Job scan — weekly.md`; never writes Excel. Session start names new/closed postings for 3 days.
+- `job-news.sh` first Monday 08:00 — company and thesis news, Opus + web search (systemd `job-news.timer`). Writes `job search/2026 ai pm/Company and thesis news — YYYY-MM.md`.
 
 ## Windows Host Tasks
 
