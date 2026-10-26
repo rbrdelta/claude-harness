@@ -85,6 +85,47 @@ test('day-digest: output over --max-chars keeps the newest end and says earlier 
   assert.equal(digest(empty).trim(), 'No sessions in the window.');
 });
 
+// --- vault-digest.py ---
+const fm = (lines, body = 'body text') => `---\n${lines.join('\n')}\n---\n${body}\n`;
+function vaultRoot() {
+  const sb = sandbox();
+  const S = 'vault/Sources';
+  sb.write(`${S}/Claude-Conversations/chat.md`, fm([`title: "Cohort plan"`, `updated: "${iso(2)}"`], 'decided a later cohort'));
+  sb.write(`${S}/Notion/page.md`, fm([`title: 'Admin isn''t a priority'`, `updated: '${iso(5)}'`], 'notion body'));
+  sb.write(`${S}/Phone-Notes/idea (ab12).md`, fm(['source: phone-notes', `phone_updated: '${iso(1)}'`], 'phone idea'));
+  sb.write(`${S}/Phone-Notes/PM updates (pm-upd).md`, fm([`phone_updated: '${iso(1)}'`], 'own output'));
+  sb.write(`${S}/Phone-Notes/diary (cd34).md`, fm([`phone_updated: '${iso(1)}'`, 'phone_folders:', '  - Personal'], 'personal text'));
+  sb.write(`${S}/Phone-Notes/secret (ef56).md`, fm([`phone_updated: '${iso(1)}'`, 'phone_tags:', '  - private'], 'private text'));
+  sb.write(`${S}/Claude-Conversations/work.md`, fm([`updated: "${iso(1)}"`, 'jpmc: work-example'], 'jpmc text'));
+  sb.write(`${S}/Notion/old.md`, fm([`updated: '${iso(40)}'`], 'old page'));
+  sb.write(`${S}/Notion/touched.md`, fm(['tags:', '  - notion'], 'no edit time'));
+  sb.write(`${S}/Apple-Notes/retired.md`, fm([`updated: '${iso(1)}'`], 'apple'));
+  return sb;
+}
+const vdigest = (sb, ...a) => sb.run('python3', [join(REPO, 'tools/vault-digest.py'), '--vault', sb.path('vault'), ...a]).out;
+
+test('vault-digest: claude.ai, phone and Notion notes edited in the window, oldest first, by their own edit time', () => {
+  const out = vdigest(vaultRoot());
+  assert.match(out, /^3 notes edited in the last 26 hours/);
+  assert.match(out, /=== Notion page: Admin isn''t a priority .*\n[\s\S]*=== claude\.ai conversation: Cohort plan .*\ndecided a later cohort[\s\S]*=== phone note: idea \(ab12\) .*\nphone idea/);
+  assert.match(vdigest(vaultRoot(), '--hours', '48'), /old page/);
+});
+
+test('vault-digest: skips the PM updates note, personal or private notes, JPMC work examples, retired Apple Notes and notes with no edit time', () => {
+  const out = vdigest(vaultRoot(), '--hours', '48');
+  assert.doesNotMatch(out, /own output|personal text|private text|jpmc text|apple|no edit time/);
+});
+
+test('vault-digest: long notes keep the opening and the end; over --max-chars the oldest notes are cut', () => {
+  const sb = vaultRoot();
+  sb.write('vault/Sources/Notion/long.md', fm([`updated: '${iso(1)}'`], 'START' + 'x'.repeat(9000) + 'END'));
+  const out = vdigest(sb);
+  assert.match(out, /STARTx+\n\[\.\.\. middle cut \.\.\.\]\nx+END/);
+  const cut = vdigest(sb, '--max-chars', '200');
+  assert.match(cut, /^\[older notes cut to fit\]\n=== /);
+  assert.doesNotMatch(cut, /Cohort plan/);
+});
+
 // --- approval-report.js ---
 test('approval-report: coverage mirrors the permission engine (Read covers Glob/Grep, Edit covers Write), counts denies, suggests rules seen twice', () => {
   const sb = sandbox();

@@ -55,13 +55,16 @@ test('pm-run bookkeeping: Sonnet, bookkeeping-only prompt, no retro step, logs t
   assert.equal(readdirSync(sb.path('.claude/logs')).filter((f) => f.startsWith('pm-bookkeeping-')).length, 1);
 });
 
-test('pm-run overnight: Opus, full /pm prompt with the Now cap of 3 and retro items protected; retro expire runs first', () => {
+test('pm-run overnight: Opus, full /pm prompt that reads the vault sources and scores on the Runway criteria, Now cap of 3, retro items protected; retro expire runs first', () => {
   const sb = base();
   sb.run('bash', [pm(sb), 'overnight']);
   const [p] = sb.prompts();
   assert.match(p, /NOW CAP: at most 3 open items in now/);
   assert.match(p, /Items whose id starts with retro- belong to the weekly retro window/);
   assert.match(p, /day-digest\.py/);
+  assert.match(p, /vault-digest\.py \(claude\.ai conversations, phone notes and Notion pages/);
+  assert.match(p, /Score and re-sort[\s\S]*Compounding value[\s\S]*Time-sensitivity[\s\S]*Proximity to the outcome/);
+  assert.match(p, /Never rank by which NorthStar priority bucket/);
   assert.match(p, /telegram-notify\.sh/);
   assert.match(p, /pm-note\.mjs/);
   assert.match(p, /vault-copy/);
