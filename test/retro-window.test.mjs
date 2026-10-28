@@ -13,9 +13,10 @@ if (cmd === 'backlog') console.log(JSON.stringify(items));
 else if (cmd === 'task-set') { const t = items.find((x) => x.id === a[0]); for (const kv of a.slice(1)) { const i = kv.indexOf('='); t[kv.slice(0, i)] = kv.slice(i + 1); } save(); }
 else if (cmd === 'task-add') { const t = { text: a[0], status: 'open' }; for (let i = 1; i < a.length; i += 2) t[a[i].slice(2)] = a[i + 1];
   t.id = t.key; delete t.key; t.order = Number(t.order); items.push(t); save(); }
+else if (cmd === 'slotted') console.log(process.env.FAKE_SLOTTED || '[]');
 `;
 
-function setup(items, { notifyFails = false } = {}) {
+function setup(items, { notifyFails = false, slotted = '[]' } = {}) {
   const sb = sandbox();
   sb.write('ds.mjs', FAKE_DS);
   sb.write('db.json', JSON.stringify(items));
@@ -24,7 +25,7 @@ function setup(items, { notifyFails = false } = {}) {
   sb.items = () => JSON.parse(sb.read('db.json'));
   sb.notes = () => sb.calls().filter((c) => c.startsWith('notify ')).map((c) => c.slice(7));
   sb.retro = (cmd) => sb.run(process.execPath, [join(REPO, 'tools/retro-window.mjs'), ...(cmd ? [cmd] : [])], {
-    env: { RETRO_DS: sb.path('ds.mjs'), RETRO_NOTIFY: sb.path('notify.sh'), RETRO_INBOX: sb.path('inbox'), RETRO_LOG: sb.path('retro.log'), FAKE_DS_DB: sb.path('db.json') },
+    env: { RETRO_DS: sb.path('ds.mjs'), RETRO_NOTIFY: sb.path('notify.sh'), RETRO_INBOX: sb.path('inbox'), RETRO_LOG: sb.path('retro.log'), FAKE_DS_DB: sb.path('db.json'), FAKE_SLOTTED: slotted },
   });
   return sb;
 }
@@ -130,4 +131,13 @@ test('retro-window: any other command prints usage and exits 2', () => {
   const r = sb.retro('close');
   assert.equal(r.code, 2);
   assert.match(r.err, /usage: retro-window\.mjs open\|expire/);
+});
+
+test('retro-window expire: a retro Daniel put into a block on the Daily Standard is kept, not skipped (2026-10-28)', () => {
+  const sb = setup([{ id: 'retro-2026-10-12', text: 'Retro — week of Oct 12', status: 'open', tier: 'now', detail: 'Window: x' }],
+    { slotted: JSON.stringify([{ date: '2026-10-14', blocks: ['evening'], taskId: 'retro-2026-10-12', priId: 'a', text: 'Retro' }]) });
+  assert.equal(sb.retro('expire').code, 0);
+  assert.equal(sb.items()[0].status, 'open');
+  assert.equal(sb.notes().length, 0);
+  assert.match(sb.read('retro.log'), /expire: retro-2026-10-12 kept, slotted on the Daily Standard/);
 });

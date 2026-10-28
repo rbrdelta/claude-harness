@@ -5,6 +5,8 @@
 //                             already full, move the last Now item to Next and tell Daniel (no permission needed).
 //   retro-window.mjs expire   start of every overnight PM run: a retro still open once Tuesday has ended is
 //                             dropped as skipped, with the decisions it left open, and Daniel is asked why.
+//                             Not if Daniel has put it into a block on the Daily Standard (2026-10-28): a slotted
+//                             retro is scheduled, and retro-launch.mjs opens its session.
 // Both are idempotent. Telegram goes through telegram-notify.sh; a failed send is logged, never fatal.
 import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync, appendFileSync } from 'node:fs';
@@ -65,7 +67,10 @@ if (cmd === 'open') {
   log(`open: ${existing ? 'promoted' : 'added'} ${key}${moved}`);
   notify(`Retro prep is ready. "Retro — week of ${pretty(mon)}" holds a Now slot Monday and Tuesday.${moved}`);
 } else if (cmd === 'expire') {
-  for (const t of items().filter((x) => /^retro-\d{4}-\d{2}-\d{2}$/.test(x.id) && x.status === 'open')) {
+  const open = items().filter((x) => /^retro-\d{4}-\d{2}-\d{2}$/.test(x.id) && x.status === 'open');
+  const slotted = open.length ? new Set(JSON.parse(ds('slotted', 'retro-', '--json')).map((s) => s.taskId)) : new Set();
+  for (const t of open) {
+    if (slotted.has(t.id)) { log(`expire: ${t.id} kept, slotted on the Daily Standard`); continue; }
     const end = new Date(`${t.id.slice(6)}T00:00:00`); end.setDate(end.getDate() + 2); // Wednesday 00:00, i.e. Tuesday has ended
     if (Date.now() < end.getTime()) continue;
     const qs = openQuestions(latestPrep());

@@ -1,0 +1,6 @@
+[Unit]
+Description=Retro launcher — start the retro session once it is slotted on the Daily Standard
+
+[Service]
+Type=oneshot
+ExecStart=/home/rbr01/.claude/hooks/retro-launch.sh

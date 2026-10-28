@@ -1,0 +1,10 @@
+[Unit]
+Description=Retro launcher — every 5 min
+
+[Timer]
+OnCalendar=*-*-* *:00/5:00
+Persistent=true
+Unit=retro-launch.service
+
+[Install]
+WantedBy=timers.target
