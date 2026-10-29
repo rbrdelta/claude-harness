@@ -48,7 +48,7 @@ for (const s of slotted.filter((x) => /^retro-\d{4}-\d{2}-\d{2}$/.test(x.taskId)
     for (let t = 0; t < WAIT_S && !url; t += 5) {
       sleep(5);
       if (!alive(sess)) break;
-      url = (tmux('capture-pane', '-p', '-J', '-S', '-200', '-t', `=${sess}`).match(/https:\/\/claude\.ai\/code\/session_\w+/) || [])[0] || null;
+      url = (tmux('capture-pane', '-p', '-J', '-S', '-200', '-t', `=${sess}:`).match(/https:\/\/claude\.ai\/code\/session_\w+/) || [])[0] || null;
     }
   } catch (e) { log(`tmux error: ${e.message.split('\n')[0]}`); }
   if (url) {

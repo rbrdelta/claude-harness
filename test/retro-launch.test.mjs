@@ -16,7 +16,7 @@ function setup(slotted, { url = true, dsFails = false } = {}) {
 case "$1" in
   has-session) [ -f "$D/\${3#=}" ];;
   new-session) printf '%s' "\${@: -1}" > "$D/$4"; ${url ? `echo "/remote-control is active · ${URL1}" >> "$D/$4.pane"` : ':'};;
-  capture-pane) t="\${@: -1}"; cat "$D/\${t#=}.pane" 2>/dev/null;;
+  capture-pane) t="\${@: -1}"; case "$t" in =*:) t="\${t#=}"; cat "$D/\${t%:}.pane" 2>/dev/null;; *) echo "can't find pane: $t" >&2; exit 1;; esac;; # real tmux: a bare =name is not a pane target
   kill-session) rm -f "$D/\${3#=}" "$D/\${3#=}.pane";;
 esac`);
   sb.notes = () => sb.calls().filter((c) => c.startsWith('notify ')).map((c) => c.slice(7));
