@@ -7,6 +7,7 @@
   publish.py stats                            print backlog numbers as JSON
   publish.py open                             undecided rows, oldest first (threads a retro can close)
   publish.py decide <page id|url> <Decision> "<why>"   park, close or promote one row, reason written on it
+  publish.py apply <decisions.json>           decide many rows: [{"url", "decision", "why"}]
 
 Every call prints one JSON line so run.sh can log it.
 """
@@ -111,6 +112,10 @@ def open_rows():
                         "strength": (pr["Strength"]["select"] or {}).get("name"),
                         "source": (pr["Source"]["select"] or {}).get("name"),
                         "batch": (pr["Batch"]["select"] or {}).get("name"),
+                        "quote": "".join(t["plain_text"] for t in pr["Quote"]["rich_text"]),
+                        "where": "".join(t["plain_text"] for t in pr["Where"]["rich_text"]),
+                        "written": (pr["Written"]["date"] or {}).get("start"),
+                        "flags": [f["name"] for f in pr["Flags"]["multi_select"]],
                         "created": p["created_time"][:10], "url": p["url"]})
         if not res.get("has_more"):
             break
@@ -123,6 +128,14 @@ def decide(page, decision, why):
     pid = page.rstrip("/").split("/")[-1].split("-")[-1].split("?")[0]
     notion("PATCH", f"/v1/pages/{pid}", {"properties": {"Decision": {"select": {"name": decision}}, "Why": text_prop(why)}})
     print(json.dumps({"decided": pid, "decision": decision}))
+
+
+def apply(path):
+    """Decide every row in a decisions file (the synthesis job's closes and synthesized rows)."""
+    rows = json.load(open(path))
+    for r in rows:
+        decide(r["url"], r["decision"], r["why"])
+    print(json.dumps({"applied": len(rows)}))
 
 
 def ping(new_count, warnings):
@@ -173,6 +186,8 @@ if __name__ == "__main__":
         clicks()
     elif cmd == "decide":
         decide(sys.argv[2], sys.argv[3], sys.argv[4])
+    elif cmd == "apply":
+        apply(sys.argv[2])
     elif cmd == "open":
         print(json.dumps(open_rows(), indent=1))
     elif cmd == "stats":

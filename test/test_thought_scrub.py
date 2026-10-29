@@ -177,7 +177,9 @@ class Publish(unittest.TestCase):
     def page(self, created, decision=None, batch="Daily"):
         sel = lambda n: {"select": {"name": n} if n else None}
         return {"created_time": created, "url": "u" + created, "properties": {
-            "Decision": sel(decision), "Thought": {"title": [{"plain_text": "th"}]}, "Strength": sel("Seed"), "Source": sel("Notion"), "Batch": sel(batch)}}
+            "Decision": sel(decision), "Thought": {"title": [{"plain_text": "th"}]}, "Strength": sel("Seed"), "Source": sel("Notion"), "Batch": sel(batch),
+            "Quote": {"rich_text": [{"plain_text": "q"}]}, "Where": {"rich_text": [{"plain_text": "w"}]},
+            "Written": {"date": {"start": "2026-10-01"}}, "Flags": {"multi_select": [{"name": "Personal"}]}}}
 
     def test_open_and_stats_page_through_the_list(self):
         pages = [{"results": [self.page("2026-10-10T00:00:00.000Z"), self.page("2026-10-01T00:00:00.000Z", "Close")], "has_more": True, "next_cursor": "c2"},
@@ -190,6 +192,15 @@ class Publish(unittest.TestCase):
         rows = pub.open_rows()
         self.assertEqual([r["created"] for r in rows], ["2026-10-01", "2026-10-05", "2026-10-10"], "oldest first")
         self.assertEqual(rows[1]["batch"], "Build moment")
+        self.assertEqual((rows[0]["quote"], rows[0]["where"], rows[0]["written"], rows[0]["flags"]), ("q", "w", "2026-10-01", ["Personal"]))
+
+    def test_apply_decides_every_row_in_the_file(self):
+        f = os.path.join(tempfile.mkdtemp(), "d.json")
+        with open(f, "w") as fh:
+            json.dump([{"url": "https://x/a-111", "decision": "Closed", "why": "Done: x"}, {"url": "https://x/b-222", "decision": "Synthesized", "why": "In cluster: y"}], fh)
+        out = quiet(pub.apply, f)
+        self.assertEqual([(c[1], c[2]["properties"]["Decision"]["select"]["name"]) for c in self.calls], [("/v1/pages/111", "Closed"), ("/v1/pages/222", "Synthesized")])
+        self.assertIn('"applied": 2', out)
 
     def test_ping_sends_a_tracked_link_and_records_it(self):
         self.reply = lambda m, p, b: {"results": [], "has_more": False}

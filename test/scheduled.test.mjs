@@ -135,61 +135,92 @@ test('weekly-northstar-check: logs OK on a clean run and FAIL with the exit code
 });
 
 // --- Weekly retro prep --------------------------------------------------------------------------
-function retroPrep(sb, { moments = '[{"thought":"x"}]', judge = true, prep = true } = {}) {
+function retroPrep(sb, { moments = '[{"thought":"x"}]', prep = true } = {}) {
   const h = 'projects/active/claude-harness';
   sb.write(`${h}/tools/day-digest.py`, 'import sys; open(__import__("os").environ["SHIM_LOG"],"a").write("digest "+" ".join(sys.argv[1:])+"\\n"); print("## Session")');
-  sb.write(`${h}/triggers/thought-scrub/publish.py`, 'import sys,os; open(os.environ["SHIM_LOG"],"a").write("publish "+" ".join(sys.argv[1:])+"\\n"); print("[]" if sys.argv[1]=="open" else "{}")');
+  sb.write(`${h}/triggers/thought-synthesis.sh`, 'echo synthesis >> "$SHIM_LOG"');
   sb.write(`${h}/tools/retro-window.mjs`, `import fs from 'node:fs'; fs.appendFileSync(process.env.SHIM_LOG, 'retro ' + process.argv[2] + '\\n');`);
   sb.write('claude-behavior.sh', `d=$(date +%Y-%m-%d); L="$HOME/.claude/logs"
 case "$2" in
   *"Find build moments"*) ${moments === null ? ':' : `printf '%s' '${moments}' > "$L/retro-moments-$d.json"`};;
-  *"You are the judge"*) ${judge ? `echo "judge ranking" > "$L/retro-judge-$d.md"` : ':'};;
   *) ${prep ? `mkdir -p "$HOME/vault/Inbox"; echo prep > "$HOME/vault/Inbox/Retro Prep — $d.md"` : ':'};;
 esac`);
   return sb.copyScript('triggers/weekly-sprint-review.sh', 'bin/sprint-review.sh', { '/mnt/c/MCP': sb.path('vault') });
 }
 
-test('weekly-sprint-review: build moments pass, judge, then prep; moments go to Notion as "Build moment"; window opens on success', () => {
+test('weekly-sprint-review: build moments, thought synthesis, then the prep (needle first, every build, emerging); window opens on success', () => {
   const sb = base();
   sb.run('bash', [retroPrep(sb)]);
   const calls = sb.calls();
   assert.ok(calls.some((c) => /^digest --hours 168 --both --max-chars 600000$/.test(c)));
-  assert.ok(calls.some((c) => c.startsWith('publish rows ') && c.endsWith(' Build moment')));
-  assert.ok(calls.some((c) => c === 'publish open'));
+  assert.ok(calls.includes('synthesis'));
+  assert.ok(!calls.some((c) => c.startsWith('publish')), 'build moments no longer go to Notion');
   const ps = sb.prompts();
-  assert.equal(ps.length, 3);
+  assert.equal(ps.length, 2);
   assert.match(ps[0], /Find build moments/);
   assert.match(ps[0], /Keep at most 8/);
-  assert.match(ps[1], /You are the judge/);
-  assert.match(ps[1], /at most 5 non-Build-moment rows/);
+  assert.match(ps[1], /## 1\. Did we move the needle\?[\s\S]*## 2\. Build review[\s\S]*## 3\. Subtraction candidates[\s\S]*## 4\. What is emerging/);
+  assert.match(ps[1], /Every project with commits or sessions this week, however many/);
+  assert.match(ps[1], /Claude's read/);
+  assert.doesNotMatch(ps[1], /__SESSIONS_FILE__|__MOMENTS_FILE__|retro-judge/);
+  assert.match(ps[1], new RegExp(`retro-moments-${today()}\\.json`));
   const cl = sb.claudeCalls();
   assert.ok(cl[0].includes('[--model] [opus]') && cl[0].includes('[--allowedTools] [Read,Write]'));
   assert.ok(cl[1].includes('[--model] [opus]'));
-  assert.ok(cl[2].includes('[--model] [sonnet]'));
-  assert.doesNotMatch(ps[2], /__JUDGE_FILE__|__BUILD_NAME__|__BUILD_DIR__/);
-  assert.match(ps[2], new RegExp(`retro-judge-${today()}\\.md`));
   assert.match(log(sb, 'weekly-sprint-review'), /OK: prep doc written to .*Retro Prep — \d{4}-\d{2}-\d{2}\.md/);
   assert.ok(calls.includes('retro open'));
 });
 
-test('weekly-sprint-review: the build under review rotates weekly through 8 builds from the week of 2026-10-25', () => {
+test('weekly-sprint-review: an empty moments pass is a warning, not fatal', () => {
   const sb = base();
-  sb.run('bash', [retroPrep(sb)]);
-  const builds = ['Daily Standard', 'Phone Notes', 'Claude Harness', 'Prototipo', 'Sound Lab', 'Partswatch', 'rowbyroh-website', 'Obsidian MCP'];
-  const week = Math.trunc((Math.floor(Date.now() / 1000) - new Date(2026, 9, 25).getTime() / 1000) / 604800);
-  const expected = builds[((week % 8) + 8) % 8];
-  assert.match(sb.prompts()[2], new RegExp(`## 2\\. Build review: ${expected} \\(`));
-});
-
-test('weekly-sprint-review: an empty moments pass and a silent judge are logged as warnings, not fatal', () => {
-  const sb = base();
-  sb.run('bash', [retroPrep(sb, { moments: null, judge: false })]);
+  sb.run('bash', [retroPrep(sb, { moments: null })]);
   const l = log(sb, 'weekly-sprint-review');
   assert.match(l, /WARN: build-moments pass produced nothing/);
-  assert.match(l, /WARN: judge produced nothing/);
-  assert.ok(!sb.calls().some((c) => c.startsWith('publish rows')));
-  assert.match(sb.read(`.claude/logs/retro-judge-${today()}.md`), /Judge did not run this week/);
+  assert.equal(sb.read(`.claude/logs/retro-moments-${today()}.json`).trim(), '[]');
   assert.match(l, /OK: prep doc written/);
+});
+
+// --- Thought synthesis -------------------------------------------------------------------------
+function synthesis(sb, { rows, context = true, note = true } = {}) {
+  const h = 'projects/active/claude-harness';
+  rows = rows ?? [{ url: 'u1', thought: 'a', flags: [] }, { url: 'u2', thought: 'b', flags: ['Personal'] }, { url: 'u3', thought: 'c', flags: [] }];
+  sb.write('open-rows.json', JSON.stringify(rows));
+  sb.write(`${h}/triggers/thought-scrub/publish.py`, 'import sys,os; open(os.environ["SHIM_LOG"],"a").write("publish "+" ".join(sys.argv[1:])+"\\n")\nif sys.argv[1]=="open": print(open(os.path.join(os.environ["HOME"],"open-rows.json")).read())');
+  sb.write('claude-behavior.sh', `case "$2" in
+  *"Gather context"*) f=$(printf '%s' "$2" | grep -o '[^ ]*synthesis-context-[^ ]*json' | head -1); ${context ? `cp "$(printf '%s' "$2" | grep -o '[^ ]*synthesis-batch-[^ ]*json' | head -1)" "$f"` : ':'};;
+  *"thought synthesis"*) d=$(printf '%s' "$2" | grep -o '[^ ]*synthesis-decisions-[^ ]*json' | head -1); ${note ? `mkdir -p "$HOME/vault/Inbox"; echo note > "$HOME/vault/Inbox/Thought Synthesis.md"; echo '[{"url":"u1","decision":"Closed","why":"Done: x"},{"url":"u3","decision":"Synthesized","why":"In cluster: y"}]' > "$d"` : ':'};;
+esac`);
+  return sb.copyScript('triggers/thought-synthesis.sh', 'bin/thought-synthesis.sh', { '/mnt/c/MCP': sb.path('vault') });
+}
+
+test('thought-synthesis: Personal rows left out; context (Sonnet), synthesis (Opus), then decisions applied and logged', () => {
+  const sb = base();
+  sb.run('bash', [synthesis(sb)]);
+  const batch = JSON.parse(sb.read(`.claude/logs/${readdirSync(sb.path('.claude/logs')).find((f) => f.includes('synthesis-batch-'))}`));
+  assert.deepEqual(batch.map((r) => r.url), ['u1', 'u3']);
+  const cl = sb.claudeCalls();
+  assert.ok(cl[0].includes('[--model] [sonnet]'));
+  assert.ok(cl[1].includes('[--model] [opus]'));
+  assert.match(sb.prompts()[0], /Never read, search or list \S*\/Confidential\//);
+  assert.match(sb.prompts()[1], /Claude's read:/);
+  assert.ok(sb.calls().some((c) => c.startsWith('publish apply ')));
+  assert.match(log(sb, 'thought-synthesis'), /OK: 2 thoughts synthesized; closed 1/);
+});
+
+test('thought-synthesis: a missing context or synthesis output is a FAIL and nothing is applied', () => {
+  for (const opts of [{ context: false }, { note: false }]) {
+    const sb = base();
+    sb.run('bash', [synthesis(sb, opts)]);
+    assert.match(log(sb, 'thought-synthesis'), /FAIL: (context pass produced nothing|synthesis pass did not write)/);
+    assert.ok(!sb.calls().some((c) => c.startsWith('publish apply')));
+  }
+});
+
+test('thought-synthesis: no open thoughts is OK with no model call', () => {
+  const sb = base();
+  sb.run('bash', [synthesis(sb, { rows: [] })]);
+  assert.match(log(sb, 'thought-synthesis'), /OK: no open thoughts/);
+  assert.equal(sb.claudeCalls().length, 0);
 });
 
 test('weekly-sprint-review: no prep doc dated today is a FAIL and the retro window stays closed', () => {
