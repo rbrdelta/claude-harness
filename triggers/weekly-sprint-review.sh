@@ -30,7 +30,7 @@ PROMPT='You are preparing data for Daniel'\''s weekly retrospective. You are NOT
 ## Hard rules
 - NO verdict line. NO "Week N: [summary]" closer.
 - NO conclusions about whether things "moved" or "stalled" — present evidence, let Daniel judge.
-- NO Claude-coined framings (no "themes," "buckets," "patterns emerging"). Surface raw signals.
+- Where you see something emerging across the data (a theme, a tension, a lesson), say it on its own line starting "Claude'\''s read:" with the evidence. Daniel leads the thinking and decides what holds (Daniel, 2026-10-29: "if you see things emerging, like, you shouldn'\''t hold back. You should be a thought partner."). Never present your read as his conclusion.
 - Open questions go at the end. Daniel answers them in /retro, not you.
 
 ## Format (Daniel, 2026-10-23)
