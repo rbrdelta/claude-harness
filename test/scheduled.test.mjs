@@ -47,6 +47,7 @@ test('pm-run bookkeeping: Sonnet, bookkeeping-only prompt, no retro step, logs t
   assert.match(p, /Never change order of existing items, never move items between now and next, never drop anything/);
   assert.match(p, /Never read anything under \/mnt\/c\/MCP\/Confidential\//);
   assert.match(p, /run-mark bookkeeping/);
+  assert.match(p, /If its project and its step in a workstream path are both obvious[\s\S]*leave it incoming/, 'bookkeeping opens an item only with a step');
   assert.ok(sb.claudeCalls()[0].includes('[--model] [sonnet]'));
   assert.ok(sb.claudeCalls()[0].includes('[--allowedTools] [Bash,Read,Write,Edit,Glob,Grep] [--permission-mode] [bypassPermissions]'));
   assert.ok(!sb.calls().some((c) => c.startsWith('retro')));
@@ -68,6 +69,9 @@ test('pm-run overnight: Opus, full /pm prompt that reads the vault sources and s
   assert.match(p, /telegram-notify\.sh/);
   assert.match(p, /pm-note\.mjs/);
   assert.match(p, /vault-copy/);
+  assert.match(p, /\$DS streams, \$DS gaps/, 'the PM run reads the workstreams and the gaps');
+  assert.match(p, /Never write a why or a finish line yourself: list missing ones under Needs you/);
+  assert.match(p, /Sections, each only if non-empty: Gaps/);
   assert.ok(sb.claudeCalls()[0].includes('[--model] [opus]'));
   const order = sb.calls().filter((c) => c.startsWith('retro') || c.startsWith('claude'));
   assert.deepEqual(order.map((c) => c.split(' ')[0]), ['retro', 'claude']);

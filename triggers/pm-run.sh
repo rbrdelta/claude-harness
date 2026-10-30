@@ -34,9 +34,11 @@ COMMON="Commands (run them with Bash):
   \$DS pull                      fetch the app's latest completions
   \$DS pending                   completions not yet recorded (key, date, outcome, text, [from: task])
   \$DS backlog --json            every work item: id, text, detail, project, tier, status, order, parent, owner
-  \$DS task-set <id> field=value …   fields: text detail project tier(now|next) owner order status(open|done|dropped|incoming) parent closedBy
-  \$DS task-add \"<text>\" --project <p> [--status done] [--tier now|next] [--parent <id>] [--detail d] [--owner o] [--order n] [--closed-by <completion key>]
+  \$DS task-set <id> field=value …   fields: text detail project step(<stream>/<step>) tier(now|next) owner order status(open|done|dropped|incoming) parent closedBy
+  \$DS task-add \"<text>\" --project <p> [--step <stream>/<step>] [--status done] [--tier now|next] [--parent <id>] [--detail d] [--owner o] [--order n] [--closed-by <completion key>]
   \$DS applied <key> …           mark completions recorded
+  \$DS streams [--json]          workstreams: why, finish line, path of steps (current marked)
+  \$DS gaps                      what the plan is missing
   \$DS run-mark $KIND \"<one-line summary>\"
 Whenever you mark something done because of a completion, tag it with that completion's key (task-set <id> status=done closedBy=<key>, or task-add ... --closed-by <key>). If Daniel later takes the Done back in the app, pull reopens every task tagged with it automatically.
 UNDONE events mean Daniel took a Done back after it was recorded; pull has already reopened the tagged tasks.
@@ -57,7 +59,7 @@ Steps:
    - If it is personal (family, errands) and matches no work item, mark it applied and record nothing.
    - If you are not confident, leave it pending for the overnight run.
 3. Leave SPLIT and MOVED completions pending; the overnight run reads them. Mark UNDONE events applied.
-4. For each item with status incoming: if its project is obvious from the backlog, task-set <id> status=open tier=next project=<p> order=<one more than the highest order in the backlog>. If not obvious, leave it incoming.
+4. For each item with status incoming: run \$DS streams. If its project and its step in a workstream path are both obvious, task-set <id> step=<stream>/<step> status=open tier=next project=<p> order=<one more than the highest order in the backlog> (ds refuses to open an item with no step). If either is not obvious, leave it incoming for the overnight run.
 5. Never change order of existing items, never move items between now and next, never drop anything.
 6. \$DS run-mark bookkeeping \"<what you recorded and filed, one line>\".
 7. End your reply with one line: what you recorded, what you filed, what you left for the overnight run."
@@ -71,11 +73,11 @@ $COMMON
   \$DS vault-copy            rewrite the Master Backlog's work-item block from the database
 
 Steps:
-1. Run \$DS pull, \$DS pending, \$DS backlog --json.
+1. Run \$DS pull, \$DS pending, \$DS backlog --json, \$DS streams, \$DS gaps.
 2. Read /mnt/c/MCP/Meta/NorthStar.md (Daniel's mission, career direction and what he is building toward: the context you score against, not a sort order) and, in /mnt/c/MCP/Inbox/Master Backlog.md, the Top Objective and the Runway Model (the scoring framework).
 3. Read what Daniel said since the last runs: python3 $HOME/projects/active/claude-harness/tools/day-digest.py (Claude Code sessions) and python3 $HOME/projects/active/claude-harness/tools/vault-digest.py (claude.ai conversations, phone notes and Notion pages that synced into the vault). Pull out (a) priorities and decisions he stated, which outrank the order written in NorthStar's Priorities section, and (b) concrete to-dos not in the backlog: add them (or leave them incoming if you can't place them). Only work items Daniel would recognize as his or Claude's next actions; not every idea mentioned. If something he said contradicts NorthStar's Priorities section, keep his latest word and list the contradiction under Needs you so NorthStar gets updated.
 4. Record every pending completion: DONE ones as in bookkeeping (status=done, or a done child via --parent for a piece of an item's work; personal items need no record). For MOVED: a task moved twice or more needs a decision (shrink it, split it, or drop it); make it and say why. For SPLIT: update the item's detail with what's left if useful. For UNDONE: the tagged tasks are already open again; check the order still makes sense and mention it if anything changes. Mark each key applied once handled.
-5. Place every incoming item: project, tier, order. Or drop it, with a reason.
+5. Place every incoming item: its step in a workstream path (task-set step=<stream>/<step>; ds refuses to open an item without one), project, tier, order. Or drop it, with a reason. Every work item rolls up mission -> workstream -> step -> item (Daniel, 2026-10-30). Daniel writes each workstream's why and finish line; you keep the path of steps. If an item fits no step, decide which it is: the path is missing a step (add it: write the stream to a temp file from \$DS streams --json and run \$DS stream-load <file>, and list it under Needs you as a proposed step) or it is off-mission (drop it, say why). Then work the gaps from \$DS gaps: a current step with no next action gets one (add the item); when a step's work is done, mark it done and move current to the next step; unplaced older items get placed. Never write a why or a finish line yourself: list missing ones under Needs you.
 6. Score and re-sort. For every open item that could hold a Now slot, score it on Daniel's framework (Runway Model, impact first):
    - Compounding value: does finishing it make the next things easier or stronger (a research result the next experiment and the applications build on, versus a one-off)?
    - Time-sensitivity: a deadline, a window that closes, or a core workstream that has stalled. Check when the item and its workstream last moved (detail, closedAt of related done items, sessions); the longer a core workstream has sat still, the more urgent its next step.
@@ -83,7 +85,7 @@ Steps:
    Never rank by which NorthStar priority bucket an item belongs to: a run of small items from the first bucket does not outrank a high-scoring item from the second. Effort and ease are never the tiebreaker (Daniel, CLAUDE.md rule 13). His standing calls: applications with time-heavy written questions go to the later written-answer cohort, quick submits count as action (2026-10-26). Now holds the top scorers; drop items that no longer earn a place.
    NOW CAP: at most 3 open items in now (Daniel, 2026-10-22: stop starting, start finishing). ds refuses a fourth, so demote before you promote. Nothing enters now unless something leaves it. If you cannot tell which of two items should hold a slot (a genuine tie on impact, not a dependency you can read), keep the current now items unchanged and message him: \$NOTIFY \"PM tie: <item A> vs <item B> for the last Now slot. A because ... B because ... Reply in a session with your pick.\" Also list it under Needs you. Items whose id starts with retro- belong to the weekly retro window (tools/retro-window.mjs): never demote, reorder or drop them; they count toward the 3.
 7. Run \$DS vault-copy.
-8. Write the PM updates entry to a temp file, then run \$PM_NOTE \"\$(date +%Y-%m-%d) \$(date +%H:%M)\" < that file. Plain language, short lines, no shorthand or codes. Sections, each only if non-empty: Now (each Now item with one line on how it scored: value, urgency, closeness to the goal), Moved, Added, Removed, Recorded done, Needs you. Each item gets a one-line why. If nothing changed, skip this step: no entry (runs are every 6 hours, and empty entries bury the real ones).
+8. Write the PM updates entry to a temp file, then run \$PM_NOTE \"\$(date +%Y-%m-%d) \$(date +%H:%M)\" < that file. Plain language, short lines, no shorthand or codes. Sections, each only if non-empty: Gaps (what the plan is missing that only Daniel can settle: a why or finish line not set, a proposed new step, a workstream with nothing moved in 14 days, each in one plain line), Now (each Now item with one line on how it scored: value, urgency, closeness to the goal), Moved, Added, Removed, Recorded done, Needs you. Each item gets a one-line why. If nothing changed, skip this step: no entry (runs are every 6 hours, and empty entries bury the real ones).
 9. \$DS run-mark overnight \"<one line>\".
 10. End your reply with the same one line."
 fi
