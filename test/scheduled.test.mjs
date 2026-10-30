@@ -185,7 +185,7 @@ function synthesis(sb, { rows, context = true, note = true } = {}) {
   const h = 'projects/active/claude-harness';
   rows = rows ?? [{ url: 'u1', thought: 'a', flags: [] }, { url: 'u2', thought: 'b', flags: ['Personal'] }, { url: 'u3', thought: 'c', flags: [] }];
   sb.write('open-rows.json', JSON.stringify(rows));
-  sb.write(`${h}/triggers/thought-scrub/publish.py`, 'import sys,os; open(os.environ["SHIM_LOG"],"a").write("publish "+" ".join(sys.argv[1:])+"\\n")\nif sys.argv[1]=="open": print(open(os.path.join(os.environ["HOME"],"open-rows.json")).read())');
+  sb.write(`${h}/triggers/thought-scrub/publish.py`, 'import sys,os; open(os.environ["SHIM_LOG"],"a").write("publish "+" ".join(sys.argv[1:])+"\\n")\nif sys.argv[1] in ("open","synthesized"): print(open(os.path.join(os.environ["HOME"],"open-rows.json")).read())');
   sb.write('claude-behavior.sh', `case "$2" in
   *"Gather context"*) f=$(printf '%s' "$2" | grep -o '[^ ]*synthesis-context-[^ ]*json' | head -1); ${context ? `cp "$(printf '%s' "$2" | grep -o '[^ ]*synthesis-batch-[^ ]*json' | head -1)" "$f"` : ':'};;
   *"thought synthesis"*) d=$(printf '%s' "$2" | grep -o '[^ ]*synthesis-decisions-[^ ]*json' | head -1); ${note ? `mkdir -p "$HOME/vault/Inbox"; echo note > "$HOME/vault/Inbox/Thought Synthesis.md"; echo '[{"url":"u1","decision":"Closed","why":"Done: x"},{"url":"u3","decision":"Synthesized","why":"In cluster: y"}]' > "$d"` : ':'};;
@@ -214,6 +214,21 @@ test('thought-synthesis: a missing context or synthesis output is a FAIL and not
     assert.match(log(sb, 'thought-synthesis'), /FAIL: (context pass produced nothing|synthesis pass did not write)/);
     assert.ok(!sb.calls().some((c) => c.startsWith('publish apply')));
   }
+});
+
+test('thought-synthesis triage: every Synthesized row re-sorted by one Opus pass on the triage rules, old note kept, decisions applied', () => {
+  const sb = base();
+  sb.write('vault/Inbox/Thought Synthesis.md', 'old note');
+  sb.run('bash', [synthesis(sb), 'triage']);
+  assert.ok(sb.calls().includes('publish synthesized'));
+  const cl = sb.claudeCalls();
+  assert.equal(cl.length, 1);
+  assert.ok(cl[0].includes('[--model] [opus]'));
+  assert.match(sb.prompts()[0], /Triage on your own/);
+  assert.match(sb.prompts()[0], /## Live themes': at most five/);
+  assert.ok(readdirSync(sb.path('.claude/logs')).some((f) => f.startsWith('thought-synthesis-before-triage-')));
+  assert.ok(sb.calls().some((c) => c.startsWith('publish apply ')));
+  assert.match(log(sb, 'thought-synthesis'), /OK: triage of 3 thoughts; closed 1/);
 });
 
 test('thought-synthesis: no open thoughts is OK with no model call', () => {

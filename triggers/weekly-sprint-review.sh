@@ -60,7 +60,7 @@ Bias to add is the default; this section counters it. List, with the evidence fo
 End the section with: "Which of these go, plus one more?"
 
 ## 4. What is emerging
-From the thought synthesis (`/mnt/c/MCP/Inbox/Thought Synthesis.md`, updated just before this prep): copy its "What changed" section, then name the two or three clusters that bear most on the priorities in part 1, with one line each on why. Thoughts the synthesis closed as done this week: list them in one line each, so Daniel can pull any back. If the synthesis did not run, say so.
+From the thought synthesis (`/mnt/c/MCP/Inbox/Thought Synthesis.md`, updated just before this prep): copy its "What changed" section and its "Live themes" (at most five; the rest of the note is reference and is not shown). Thoughts the synthesis closed as done this week: list them in one line each, so Daniel can pull any back. If the synthesis did not run, say so.
 
 ## Open questions for Daniel
 3-5 questions drawn from the parts above, the first on part 1 (are we doing the important things). No status questions.

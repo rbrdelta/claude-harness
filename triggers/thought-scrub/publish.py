@@ -99,11 +99,12 @@ def stats():
     return {"open": len(open_rows), "decided": decided, "oldest_open_days": oldest_days}
 
 
-def open_rows():
-    """Undecided Thought Review rows, oldest first: the threads a retro can close."""
+def open_rows(decision=None):
+    """Thought Review rows, oldest first: undecided ones (the synthesis job's input), or those with one decision."""
     out, cursor = [], None
+    flt = {"equals": decision} if decision else {"is_empty": True}
     while True:
-        body = {"page_size": 100, "filter": {"property": "Decision", "select": {"is_empty": True}},
+        body = {"page_size": 100, "filter": {"property": "Decision", "select": flt},
                 **({"start_cursor": cursor} if cursor else {})}
         res = notion("POST", f"/v1/databases/{NOTION_DB}/query", body)
         for p in res["results"]:
@@ -116,6 +117,7 @@ def open_rows():
                         "where": "".join(t["plain_text"] for t in pr["Where"]["rich_text"]),
                         "written": (pr["Written"]["date"] or {}).get("start"),
                         "flags": [f["name"] for f in pr["Flags"]["multi_select"]],
+                        "why": "".join(t["plain_text"] for t in pr["Why"]["rich_text"]),
                         "created": p["created_time"][:10], "url": p["url"]})
         if not res.get("has_more"):
             break
@@ -190,6 +192,8 @@ if __name__ == "__main__":
         apply(sys.argv[2])
     elif cmd == "open":
         print(json.dumps(open_rows(), indent=1))
+    elif cmd == "synthesized":
+        print(json.dumps(open_rows("Synthesized"), indent=1))
     elif cmd == "stats":
         print(json.dumps(stats()))
     else:

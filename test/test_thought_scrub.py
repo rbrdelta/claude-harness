@@ -179,7 +179,8 @@ class Publish(unittest.TestCase):
         return {"created_time": created, "url": "u" + created, "properties": {
             "Decision": sel(decision), "Thought": {"title": [{"plain_text": "th"}]}, "Strength": sel("Seed"), "Source": sel("Notion"), "Batch": sel(batch),
             "Quote": {"rich_text": [{"plain_text": "q"}]}, "Where": {"rich_text": [{"plain_text": "w"}]},
-            "Written": {"date": {"start": "2026-10-01"}}, "Flags": {"multi_select": [{"name": "Personal"}]}}}
+            "Written": {"date": {"start": "2026-10-01"}}, "Flags": {"multi_select": [{"name": "Personal"}]},
+            "Why": {"rich_text": [{"plain_text": "In cluster: c"}]}}}
 
     def test_open_and_stats_page_through_the_list(self):
         pages = [{"results": [self.page("2026-10-10T00:00:00.000Z"), self.page("2026-10-01T00:00:00.000Z", "Close")], "has_more": True, "next_cursor": "c2"},
@@ -193,6 +194,14 @@ class Publish(unittest.TestCase):
         self.assertEqual([r["created"] for r in rows], ["2026-10-01", "2026-10-05", "2026-10-10"], "oldest first")
         self.assertEqual(rows[1]["batch"], "Build moment")
         self.assertEqual((rows[0]["quote"], rows[0]["where"], rows[0]["written"], rows[0]["flags"]), ("q", "w", "2026-10-01", ["Personal"]))
+        self.assertEqual(rows[0]["why"], "In cluster: c")
+        self.assertEqual(self.calls[2][2]["filter"]["select"], {"is_empty": True}, "open = undecided")
+
+    def test_rows_with_one_decision_for_the_triage(self):
+        self.reply = lambda m, p, b: {"results": [self.page("2026-10-02T00:00:00.000Z", "Synthesized")], "has_more": False}
+        rows = pub.open_rows("Synthesized")
+        self.assertEqual(self.calls[0][2]["filter"]["select"], {"equals": "Synthesized"})
+        self.assertEqual(rows[0]["why"], "In cluster: c")
 
     def test_apply_decides_every_row_in_the_file(self):
         f = os.path.join(tempfile.mkdtemp(), "d.json")

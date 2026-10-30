@@ -6,13 +6,18 @@
 # 2. synthesis pass (Opus): fold them into the living note, propose closes for thoughts already done
 # 3. apply: done thoughts -> Closed, the rest -> Synthesized, each with its reason on the Notion row
 # Personal-flagged rows are left out and stay open.
+# Triage is the job's, not Daniel's (2026-10-30): "I also expect you to be able to do that on your own so that it
+# doesn't require my review all the time." A thought already covered by a rule, the thesis or a build is closed.
 # Usage: thought-synthesis.sh [limit]   (default 40, oldest first)
+#        thought-synthesis.sh triage    (re-sort every Synthesized row and the note into the shape below)
 
 LOG_FILE="$HOME/.claude/hooks/thought-synthesis.log"
 OUTPUT_DIR="$HOME/.claude/logs"
 WORK_DIR="$HOME/projects/active/claude-harness"
 NOTE="/mnt/c/MCP/Inbox/Thought Synthesis.md"
 LIMIT="${1:-40}"
+MODE=synthesize
+[ "$1" = "triage" ] && MODE=triage
 
 log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $1" >> "$LOG_FILE"; }
 
@@ -32,6 +37,42 @@ BATCH_FILE="$OUTPUT_DIR/synthesis-batch-$STAMP.json"
 CONTEXT_FILE="$OUTPUT_DIR/synthesis-context-$STAMP.json"
 DECISIONS_FILE="$OUTPUT_DIR/synthesis-decisions-$STAMP.json"
 PUBLISH="$WORK_DIR/triggers/thought-scrub/publish.py"
+
+SHAPE="Keep the note to this shape (Daniel, 2026-10-30: cut the list; only what is new or needs him reaches him):
+- Frontmatter: title \"Thought Synthesis\", source: thought-synthesis, tags [synthesis], updated: today.
+- '## What changed (<today>)': what moved this run, short. Replace it each run.
+- '## Live themes': at most five, the ones that bear on the newest NorthStar PRIORITIES. Each: a '### <name>' heading, one line on why it matters to a priority, his two to four strongest quotes verbatim with date and source (never paraphrase his words), 'Claude's read:' (marked as yours: what is emerging, a tension, a post or thesis line), and 'His call:' the decision or next step that is his, if any. This is the only part the weekly retro shows him.
+- '## Leads for the venture hypothesis': thoughts that are leads for the 2027 business hypothesis, one line each (short verbatim quote, date).
+- '## Kept for reference': thoughts that say who he is or what he cares about but bear on no current priority (craft, making, his standard, how he learns, his creative process, his prose). Short headings, one line each (short verbatim quote, date). Never reviewed weekly; source material for his own personal writing (CLAUDE.md rule 16).
+- '## Closed': one line each for every thought closed (done or covered), with where it landed or what covers it. Kept across runs.
+Day-job (JPMC) material never goes in.
+
+Triage on your own; do not leave it to him. Close a thought (decision Closed) when the record shows it was done, or when it is covered: the same idea is already a CLAUDE.md rule (~/.claude/CLAUDE.md), already his research thesis or an active experiment's question (NorthStar, the sound experiment), already built, or a near-duplicate of a thought kept in the note (keep his strongest wording, close the rest pointing to it). His example: fifteen thoughts on whether the model can hear and whether that changes what it does are the sound experiment; close them. Never close a thought only because it seems minor: it goes to Kept for reference. Never drop a thought silently: every one is in a section or in Closed.
+
+Decisions JSON: one element for EVERY url you were given: {\"url\", \"decision\": \"Closed\" or \"Synthesized\", \"why\": \"Done: <where>\" or \"Covered: <rule, thesis, build or kept thought>\" or \"Theme: <name>\" or \"Lead\" or \"Reference: <heading>\"}."
+
+if [ "$MODE" = "triage" ]; then
+    ROWS_FILE="$OUTPUT_DIR/synthesis-triage-rows-$STAMP.json"
+    python3 "$PUBLISH" synthesized > "$ROWS_FILE" 2>>"$LOG_FILE" || { log "FAIL: could not list synthesized thoughts"; exit 1; }
+    COUNT=$(python3 -c "import json,sys; print(len(json.load(open(sys.argv[1]))))" "$ROWS_FILE")
+    [ -f "$NOTE" ] && cp "$NOTE" "$OUTPUT_DIR/thought-synthesis-before-triage-$STAMP.md"
+    TRIAGE_PROMPT="You keep Daniel's thought synthesis: $NOTE. He leads the thinking; you are a thought partner (CLAUDE.md rule 17), and the triage is yours. Read the note (it holds each thought's context and what came of it), $ROWS_FILE (every thought currently marked Synthesized, with its url, quote and current placement), ~/.claude/CLAUDE.md, and /mnt/c/MCP/Meta/NorthStar.md (the newest PRIORITIES). Rewrite the note in place, re-sorting every thought.
+
+$SHAPE
+
+Write the decisions JSON to $DECISIONS_FILE."
+    ( cd "$WORK_DIR" && claude -p "$TRIAGE_PROMPT" --model opus --allowedTools "Read,Write,Edit,Grep,Glob" --permission-mode bypassPermissions >/dev/null 2>&1 )
+    if [ ! -s "$DECISIONS_FILE" ] || [ ! -f "$NOTE" ]; then
+        log "FAIL: triage pass did not write the note and decisions ($COUNT thoughts); nothing applied"
+        exit 1
+    fi
+    if python3 "$PUBLISH" apply "$DECISIONS_FILE" >> "$LOG_FILE" 2>&1; then
+        log "OK: triage of $COUNT thoughts; closed $(grep -o '"Closed"' "$DECISIONS_FILE" | wc -l)"
+        exit 0
+    fi
+    log "FAIL: could not apply triage decisions from $DECISIONS_FILE"
+    exit 1
+fi
 
 python3 "$PUBLISH" open 2>>"$LOG_FILE" | python3 -c "
 import json, sys
@@ -59,16 +100,13 @@ fi
 
 SYNTH_PROMPT="You keep Daniel's thought synthesis: $NOTE (create it if missing). Daniel, 2026-10-29: \"The point is not to capture each of them independently. It's for you to start synthesizing them\", into \"themes or posts or thoughts or a thesis or some kind of statement about the work that I'm doing or what I've learned or what is emerging or what is interesting or what might be worth sharing.\" He leads the thinking; you are a thought partner: \"if you see things emerging, like, you shouldn't hold back.\" His original ideas, conclusions and thesis are his; your read is marked as yours.
 
-Read the note, then $CONTEXT_FILE (new thoughts with their context). Also read /mnt/c/MCP/Meta/NorthStar.md (the newest PRIORITIES section) so you can say how a cluster bears on what matters to him.
+Read the note, then $CONTEXT_FILE (new thoughts with their context). Also read /mnt/c/MCP/Meta/NorthStar.md (the newest PRIORITIES section) so you can say how a theme bears on what matters to him, and ~/.claude/CLAUDE.md so you can tell when a thought is already a rule.
 
-Rewrite the note in place:
-- Frontmatter: title \"Thought Synthesis\", source: thought-synthesis, tags [synthesis], updated: today.
-- '## What changed (<today>)' at the top: new clusters, clusters that grew, thoughts closed as done. Replace this section each run.
-- One '## <cluster name>' per cluster. Under each: his quotes verbatim with date and source (never paraphrase his words); what came of each; then 'Claude's read:' what is emerging (a theme, a post, a thesis statement, a tension, an opportunity) and how it bears on his priorities; then 'Could become:' post / work item / thesis / nothing yet. Merge new thoughts into existing clusters where they fit; start a new cluster only when none fits. A cluster of one is fine.
-- '## Done' at the end: thoughts the record shows already happened, each with where it landed (one line each, kept across runs).
-- Day-job (JPMC) material never goes in.
+Merge the new thoughts in.
 
-Then write a JSON array to $DECISIONS_FILE with one element for EVERY url in the context file: {\"url\", \"decision\": \"Closed\" if status is done and the outcome is clearly evidenced, otherwise \"Synthesized\", \"why\": \"Done: <where it landed>\" or \"In cluster: <cluster name>\"}."
+$SHAPE
+
+Write the decisions JSON to $DECISIONS_FILE (one element per url in the context file)."
 ( cd "$WORK_DIR" && claude -p "$SYNTH_PROMPT" --model opus --allowedTools "Read,Write,Edit,Grep,Glob" --permission-mode bypassPermissions >/dev/null 2>&1 )
 if [ ! -s "$DECISIONS_FILE" ] || [ ! -f "$NOTE" ]; then
     log "FAIL: synthesis pass did not write the note and decisions ($COUNT thoughts); nothing applied"
