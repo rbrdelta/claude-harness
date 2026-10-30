@@ -71,6 +71,8 @@ test('pm-run overnight: Opus, full /pm prompt that reads the vault sources and s
   assert.match(p, /vault-copy/);
   assert.match(p, /\$DS streams, \$DS gaps/, 'the PM run reads the workstreams and the gaps');
   assert.match(p, /Never write a why or a finish line yourself: list missing ones under Needs you/);
+  assert.match(p, /Never drop an item for fitting no workstream/);
+  assert.doesNotMatch(p, /off-mission \(drop it/, 'the run never drops an item for fitting no workstream');
   assert.match(p, /Sections, each only if non-empty: Gaps/);
   assert.ok(sb.claudeCalls()[0].includes('[--model] [opus]'));
   const order = sb.calls().filter((c) => c.startsWith('retro') || c.startsWith('claude'));
