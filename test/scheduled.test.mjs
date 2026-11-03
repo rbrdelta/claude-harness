@@ -385,3 +385,64 @@ test('job-news: Opus with web search, prompt forbids Excel writes and Confidenti
   sb.run('bash', [s], { env: { JOB_SEARCH_DIR: dir, FAKE_CLAUDE_EXIT: '1' } });
   assert.match(log(sb, 'job-news'), /FAIL \(exit 1\)/);
 });
+
+// --- @Claude requests from phone notes (2026-11-03) ---------------------------------------------
+// Stand-in requests.mjs: `list --json` prints FAKE_PENDING pending requests; FAKE_LIST_FAIL makes it fail.
+function phoneReq(sb) {
+  sb.write('projects/active/phone-notes/scripts/requests.mjs',
+    `import fs from 'node:fs'; fs.appendFileSync(process.env.SHIM_LOG, 'requests ' + process.argv.slice(2).join(' ') + '\\n');
+if (process.env.FAKE_LIST_FAIL) { console.error('vault unreadable'); process.exit(1); }
+const n = +(process.env.FAKE_PENDING || 0);
+console.log(JSON.stringify({ pending: Array.from({ length: n }, (_, i) => ({ id: 'r' + i })), waiting: [] }));`);
+  return sb.copyScript('triggers/phone-requests.sh', 'bin/phone-requests.sh');
+}
+
+test('phone-requests: no new request means no model run and nothing logged', () => {
+  const sb = base();
+  sb.run('bash', [phoneReq(sb)], { env: { FAKE_PENDING: '0' } });
+  assert.equal(sb.claudeCalls().length, 0);
+  assert.ok(sb.calls().some((c) => c.startsWith('requests list --json')));
+  assert.throws(() => log(sb, 'phone-requests'), 'no log line every 30 minutes');
+});
+
+test('phone-requests: new requests start one Opus run in phone-notes with the 11/01 rules; OK logs the last line', () => {
+  const sb = base();
+  sb.run('bash', [phoneReq(sb)], { env: { FAKE_PENDING: '2', FAKE_CLAUDE_OUT: 'working\n1 done, 1 asked' } });
+  const [p] = sb.prompts();
+  assert.ok(sb.claudeCalls()[0].includes('[--model] [opus]'));
+  assert.ok(sb.claudeCalls()[0].includes('[--permission-mode] [bypassPermissions]'));
+  assert.ok(sb.calls().some((c) => c.includes('HARNESS_SCHEDULED=1') && c.includes('phone-notes')));
+  assert.match(p, /Phone Notes .* and Daily Standard .* only/);
+  assert.match(p, /\$REQ start <id> first/);
+  assert.match(p, /run \.\/verify\.sh until every line passes[\s\S]*deploy live[\s\S]*done <id> --summary/);
+  assert.match(p, /Stop and ask[\s\S]*more than one reasonable reading[\s\S]*cannot reproduce a bug[\s\S]*big change to how the tool is used/);
+  assert.match(p, /undo your change/);
+  assert.match(p, /never read, quote or write a personal note or anything in \/mnt\/c\/MCP\/Confidential\//);
+  assert.match(p, /never force-push or skip hooks/);
+  assert.match(p, /telegram-notify\.sh/);
+  assert.match(log(sb, 'phone-requests'), /START: 2 request\(s\)\n.*OK: 1 done, 1 asked\n$/);
+  assert.equal(readdirSync(sb.path('.claude/logs')).filter((f) => f.startsWith('phone-requests-')).length, 1);
+});
+
+test('phone-requests: a failed list or a failed model run logs FAIL', () => {
+  const sb = base();
+  const s = phoneReq(sb);
+  sb.run('bash', [s], { env: { FAKE_LIST_FAIL: '1' } });
+  assert.match(log(sb, 'phone-requests'), /FAIL: requests list: vault unreadable/);
+  assert.equal(sb.claudeCalls().length, 0);
+  sb.run('bash', [s], { env: { FAKE_PENDING: '1', FAKE_CLAUDE_EXIT: '4' } });
+  assert.match(log(sb, 'phone-requests'), /FAIL \(exit 4\): /);
+});
+
+test('phone-requests: a run still working when the timer fires again is left alone', async () => {
+  const sb = base();
+  const s = phoneReq(sb);
+  sb.write('.claude/phone-notes/.keep', '');
+  const { spawn } = await import('node:child_process');
+  const holder = spawn('flock', [sb.path('.claude/phone-notes/requests-run.lock'), 'sleep', '5']);
+  await new Promise((r) => setTimeout(r, 300));
+  sb.run('bash', [s], { env: { FAKE_PENDING: '1' } });
+  holder.kill();
+  assert.equal(sb.claudeCalls().length, 0);
+  assert.ok(!sb.calls().some((c) => c.startsWith('requests')), 'not even listed');
+});

@@ -1,0 +1,6 @@
+[Unit]
+Description=@Claude requests from phone notes — work new ones with nobody at the keyboard
+
+[Service]
+Type=oneshot
+ExecStart=/home/rbr01/.claude/hooks/phone-requests.sh

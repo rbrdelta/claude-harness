@@ -1,0 +1,10 @@
+[Unit]
+Description=@Claude requests — 10 minutes after each phone-notes pull, with catch-up
+
+[Timer]
+OnCalendar=*-*-* *:10/30:00
+Persistent=true
+Unit=phone-requests.service
+
+[Install]
+WantedBy=timers.target
