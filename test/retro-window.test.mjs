@@ -31,7 +31,7 @@ function setup(items, { notifyFails = false, slotted = '[]' } = {}) {
   return sb;
 }
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-function comingMonday() { const d = new Date(); d.setDate(d.getDate() + ((8 - d.getDay()) % 7)); return ymd(d); }
+function comingMonday() { const d = new Date(); d.setDate(d.getDate() + (d.getDay() === 2 ? -1 : (8 - d.getDay()) % 7)); return ymd(d); } // the week the tool opens today (Tuesday = yesterday's Monday)
 const now = (id, order) => ({ id, text: `item ${id}`, status: 'open', tier: 'now', order });
 
 test('retro-window open: adds "Retro — week of <Mon>" to Now at the top, owned by Both, keyed retro-<Monday>', () => {
@@ -141,4 +141,17 @@ test('retro-window expire: a retro Daniel put into a block on the Daily Standard
   assert.equal(sb.items()[0].status, 'open');
   assert.equal(sb.notes().length, 0);
   assert.match(sb.read('retro.log'), /expire: retro-2026-10-12 kept, slotted on the Daily Standard/);
+});
+
+test('retro-window open: a late run on Tuesday opens this week (yesterday\'s Monday), not next week', () => {
+  const sb = setup([now('a', 1)]);
+  sb.write('inbox/Retro Prep — 2026-11-01.md', 'prep');
+  const run = (day) => sb.run(process.execPath, [join(REPO, 'tools/retro-window.mjs'), 'open'], {
+    env: { RETRO_TODAY: day, RETRO_DS: sb.path('ds.mjs'), RETRO_NOTIFY: sb.path('notify.sh'), RETRO_INBOX: sb.path('inbox'), RETRO_LOG: sb.path('retro.log'), FAKE_DS_DB: sb.path('db.json'), FAKE_SLOTTED: '[]' } });
+  assert.equal(run('2026-11-03').code, 0);
+  assert.ok(sb.items().some((t) => t.id === 'retro-2026-11-02'), 'Tuesday Nov 3 -> week of Nov 2');
+  assert.equal(run('2026-11-01').code, 0);
+  assert.ok(sb.items().some((t) => t.id === 'retro-2026-11-02'), 'Sunday Nov 1 -> the next day, Nov 2');
+  assert.equal(run('2026-11-04').code, 0);
+  assert.ok(sb.items().some((t) => t.id === 'retro-2026-11-09'), 'Wednesday -> the coming Monday');
 });

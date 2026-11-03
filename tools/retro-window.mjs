@@ -43,8 +43,10 @@ function openQuestions(prep) {
 
 const cmd = process.argv[2];
 if (cmd === 'open') {
-  const d = new Date();
-  d.setDate(d.getDate() + ((8 - d.getDay()) % 7)); // the coming Monday (today if Monday)
+  const d = process.env.RETRO_TODAY ? new Date(`${process.env.RETRO_TODAY}T12:00:00`) : new Date();
+  // The week's Monday: tomorrow on Sunday (the normal run), today on Monday, yesterday on Tuesday (a late rerun
+  // still opens this week's window, 2026-11-03); later in the week, the coming Monday.
+  d.setDate(d.getDate() + (d.getDay() === 2 ? -1 : (8 - d.getDay()) % 7));
   const mon = ymd(d);
   const key = `retro-${mon}`;
   const all = items();
