@@ -12,6 +12,7 @@ const save = () => fs.writeFileSync(db, JSON.stringify(items));
 if (cmd === 'backlog') console.log(JSON.stringify(items));
 else if (cmd === 'task-set') { const t = items.find((x) => x.id === a[0]); for (const kv of a.slice(1)) { const i = kv.indexOf('='); t[kv.slice(0, i)] = kv.slice(i + 1); } save(); }
 else if (cmd === 'task-add') { const t = { text: a[0], status: 'open' }; for (let i = 1; i < a.length; i += 2) t[a[i].slice(2)] = a[i + 1];
+  if (!t.step) { console.error('"' + t.text + '" has no step'); process.exit(1); } // the real ds refuses unplaced open items (2026-10-30)
   t.id = t.key; delete t.key; t.order = Number(t.order); items.push(t); save(); }
 else if (cmd === 'slotted') console.log(process.env.FAKE_SLOTTED || '[]');
 `;
@@ -42,7 +43,7 @@ test('retro-window open: adds "Retro — week of <Mon>" to Now at the top, owned
   const r = sb.items().find((t) => t.id === key);
   assert.ok(r, `expected ${key}`);
   assert.match(r.text, /^Retro — week of [A-Z][a-z]{2} \d{1,2}$/);
-  assert.equal(r.tier, 'now'); assert.equal(r.order, -1); assert.equal(r.owner, 'Both'); assert.equal(r.project, 'Harness');
+  assert.equal(r.tier, 'now'); assert.equal(r.order, -1); assert.equal(r.owner, 'Both'); assert.equal(r.project, 'Harness'); assert.equal(r.step, 'upkeep', 'placed on the upkeep step, or ds refuses it');
   assert.match(r.detail, /^Window: Monday .* through Tuesday .*Prep: Retro Prep — 2026-10-18\.md\. If it is not closed by the end of Tuesday it is marked skipped/);
   assert.equal(sb.items().find((t) => t.id === 'a').tier, 'now', 'room left: nothing demoted');
   assert.match(sb.notes()[0], /^Retro prep is ready\. "Retro — week of .*" holds a Now slot Monday and Tuesday\.$/);

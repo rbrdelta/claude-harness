@@ -62,8 +62,9 @@ if (cmd === 'open') {
   const tue = new Date(d); tue.setDate(d.getDate() + 1);
   const prep = latestPrep();
   const detail = `Window: Monday ${pretty(mon)} through Tuesday ${pretty(ymd(tue))}. Run /retro with Claude. Prep: ${prep ? prep.split('/').pop() : 'missing'}. If it is not closed by the end of Tuesday it is marked skipped, with the decisions it left open.`;
-  if (existing) ds('task-set', key, 'tier=now', 'order=-1', `detail=${detail}`);
-  else ds('task-add', `Retro — week of ${pretty(mon)}`, '--project', 'Harness', '--tier', 'now', '--key', key, '--order', '-1', '--owner', 'Both', '--detail', detail);
+  // Every open item needs a workstream step since 2026-10-30 (ds refuses it otherwise); the retro is upkeep.
+  if (existing) ds('task-set', key, 'tier=now', 'order=-1', 'step=upkeep', `detail=${detail}`);
+  else ds('task-add', `Retro — week of ${pretty(mon)}`, '--project', 'Harness', '--tier', 'now', '--key', key, '--order', '-1', '--owner', 'Both', '--step', 'upkeep', '--detail', detail);
   log(`open: ${existing ? 'promoted' : 'added'} ${key}${moved}`);
   notify(`Retro prep is ready. "Retro — week of ${pretty(mon)}" holds a Now slot Monday and Tuesday.${moved}`);
 } else if (cmd === 'expire') {
