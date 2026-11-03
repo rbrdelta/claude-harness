@@ -73,7 +73,13 @@ test('pm-run overnight: Opus, full /pm prompt that reads the vault sources and s
   assert.match(p, /Never write a why or a finish line yourself: list missing ones under Needs you/);
   assert.match(p, /Never drop an item for fitting no workstream/);
   assert.doesNotMatch(p, /off-mission \(drop it/, 'the run never drops an item for fitting no workstream');
-  assert.match(p, /Sections, each only if non-empty: Gaps/);
+  assert.match(p, /sections, each only if non-empty: Gaps/);
+  assert.match(p, /Start with Focus: today's one thing/, 'the PM note leads with the focus (2026-11-03 retro)');
+  assert.match(p, /WEEKLY OUTCOMES AND THE ONE THING/);
+  assert.match(p, /\$DS one-set <id> --by pm/);
+  assert.match(p, /never replaced: it stays until done/);
+  assert.match(p, /never write or change them yourself/);
+  assert.match(p, /no cohorts/);
   assert.ok(sb.claudeCalls()[0].includes('[--model] [opus]'));
   const order = sb.calls().filter((c) => c.startsWith('retro') || c.startsWith('claude'));
   assert.deepEqual(order.map((c) => c.split(' ')[0]), ['retro', 'claude']);
