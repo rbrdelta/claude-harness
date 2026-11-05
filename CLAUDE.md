@@ -37,6 +37,9 @@ Pattern: `claude -p "$PROMPT" --model sonnet --allowedTools "Bash,Read,Write,Edi
 - `session-stats-hook.sh` + `session-stats.py` — PostStop session stats logging
 - `log-tool-use.sh` — Tool usage logging
 - `approval-report.js` — Permission approval reporting
+- `pre-rm-committed-check.sh` — PreToolUse (Bash): blocks a delete inside a git repo unless the target has a clean committed copy
+- `verify-reminder.sh` — PostToolUse: after an edit, names the project's verify command
+- `check-uncommitted.sh` — Stop: lists active projects with uncommitted changes
 - `capabilities-gate.py` — keeps every project's capabilities file current (2026-10-23). PreToolUse (Bash): refuses a `git push` that changes code without updating the capabilities file (`CAPABILITIES.md` in the repo, or for public repos the vault file `Sources/Capabilities/<name>.md` with `checked_commit` set to a pushed commit); a commit line `capabilities: no change` passes on purpose; README/CLAUDE.md/NEXT-SESSION.md/notes-only pushes pass; an unregistered repo under `~/projects/active/` can't push. PostToolUse: copies repo files into the vault after the push lands. SessionStart `--audit`: names projects whose code moved past their file. Registry: `capabilities-projects.json`. A bug in the gate lets the push through with an error, never wedges it. Tests: `test/test_capabilities_gate.py`
 
 ## Session Tracking

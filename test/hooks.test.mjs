@@ -417,3 +417,51 @@ test('harness-check: job scan — names new/closed postings for 3 days, silent w
   sb.write('.claude/hooks/job-news.log', `${stamp(24 * 3)} OK: 12\n${stamp(1)} FAIL: run finished but note was not written\n`);
   assert.match(harness(sb).out, /JOB NEWS: LAST RUN FAILED/);
 });
+
+// --- Delete guard, uncommitted warning, verify reminder ----------------------------------------
+function gitRepo(sb, rel) {
+  const dir = sb.path(rel);
+  sb.write(`${rel}/clean.txt`, 'kept');
+  const git = (...a) => sb.run('git', ['-C', dir, '-c', 'user.email=t@t', '-c', 'user.name=t', ...a]);
+  git('init', '-q'); git('add', '.'); git('commit', '-qm', 'first');
+  return { dir, git };
+}
+const rmCheck = (sb, command, tool_name = 'Bash') => sb.run('bash', [hook('pre-rm-committed-check.sh')], { input: JSON.stringify({ tool_name, tool_input: { command } }) });
+
+test('pre-rm-committed-check: a delete needs a clean committed copy; outside a repo it is allowed', () => {
+  const sb = sandbox();
+  const { dir } = gitRepo(sb, 'repo');
+  assert.equal(rmCheck(sb, `rm ${dir}/clean.txt`).code, 0);
+  sb.write('repo/new.txt', 'x');
+  const r = rmCheck(sb, `ls && rm ${dir}/new.txt`);
+  assert.equal(r.code, 2);
+  assert.match(r.out + r.err, /untracked file .* has no git backup/);
+  sb.write('repo/clean.txt', 'edited');
+  assert.equal(rmCheck(sb, `rm -f ${dir}/clean.txt`).code, 2);
+  assert.equal(rmCheck(sb, `rm ${dir}/*.txt`).code, 2, 'a glob is refused, not guessed at');
+  sb.write('loose.txt', 'x');
+  assert.equal(rmCheck(sb, `rm ${sb.path('loose.txt')}`).code, 0);
+  assert.equal(rmCheck(sb, 'git status').code, 0);
+  assert.equal(rmCheck(sb, `rm ${dir}/new.txt`, 'Read').code, 0);
+});
+
+test('check-uncommitted: names active projects with uncommitted changes, nested ones too; silent when clean', () => {
+  const sb = sandbox();
+  gitRepo(sb, 'projects/active/one');
+  gitRepo(sb, 'projects/active/web/site');
+  assert.equal(sb.run('bash', [hook('check-uncommitted.sh')]).out, '');
+  sb.write('projects/active/one/a.txt', 'x');
+  sb.write('projects/active/web/site/b.txt', 'x');
+  const { out } = sb.run('bash', [hook('check-uncommitted.sh')]);
+  assert.match(out, /UNCOMMITTED WORK in 2 project\(s\):\n {2}- one \(1 files\)\n {2}- web\/site \(1 files\)/);
+});
+
+test('verify-reminder: an edit to a known project names its verify command; memory, vault and other tools stay quiet', () => {
+  const sb = sandbox();
+  const edit = (file_path, tool_name = 'Edit') => sb.run('bash', [hook('verify-reminder.sh')], { input: JSON.stringify({ tool_name, tool_input: { file_path } }) });
+  const r = edit('/x/obsidian-mcp/src/a.ts');
+  assert.equal(r.code, 0);
+  assert.match(r.err, /Project: obsidian-mcp\nBefore claiming this task is done, run: npm run promote/);
+  assert.match(edit('/x/elsewhere/a.py').err, /define a verify step/);
+  for (const quiet of [edit('/x/.claude/memory/a.md'), edit('/mnt/c/MCP/Inbox/a.md'), edit('/x/elsewhere/a.txt'), edit('/x/obsidian-mcp/a.ts', 'Read')]) assert.equal(quiet.err, '');
+});
