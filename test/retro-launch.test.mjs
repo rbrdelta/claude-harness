@@ -7,9 +7,9 @@ import { sandbox, REPO } from './helpers.mjs';
 const URL1 = 'https://claude.ai/code/session_01AbcDEF';
 const slot = (taskId, date = '2026-10-28', blocks = ['evening']) => ({ date, blocks, taskId, priId: 'p1', text: 'Retro' });
 
-function setup(slotted, { url = true, dsFails = false } = {}) {
+function setup(slotted, { url = true, dsFails = false, dsStderr = '', dsFailTimes = 0 } = {}) {
   const sb = sandbox();
-  sb.write('ds.mjs', `import fs from 'node:fs'; fs.appendFileSync(process.env.SHIM_LOG, 'ds ' + process.argv.slice(2).join(' ') + '\\n'); ${dsFails ? 'process.exit(1);' : ''} console.log(process.env.FAKE_SLOTTED);`);
+  sb.write('ds.mjs', `import fs from 'node:fs'; fs.appendFileSync(process.env.SHIM_LOG, 'ds ' + process.argv.slice(2).join(' ') + '\\n'); ${dsFails ? `console.error(${JSON.stringify(dsStderr)}); process.exit(1);` : ''} const n = fs.readFileSync(process.env.SHIM_LOG, 'utf8').split('\\n').filter((l) => l.startsWith('ds ')).length; if (n <= ${dsFailTimes}) { console.error(${JSON.stringify(dsStderr)}); process.exit(1); } console.log(process.env.FAKE_SLOTTED);`);
   sb.write('notify.sh', `#!/bin/bash\nprintf 'notify %s\\n' "$1" >> "$SHIM_LOG"`, 0o755);
   // Fake tmux: a session is a file under tmux/; its pane shows the Remote Control link unless url is off.
   sb.shim('tmux', `D="$HOME/tmux"; mkdir -p "$D"
@@ -81,4 +81,31 @@ test('retro-launch: ds failing is logged and exits non-zero; nothing started', (
   assert.equal(sb.launch().code, 1);
   assert.match(sb.read('launch.log'), /FAIL: ds slotted/);
   assert.ok(!sb.calls().some((c) => c.includes('new-session')));
+});
+
+const CONNECT_ERROR = "TypeError: fetch failed\n  [cause]: AggregateError [ETIMEDOUT]:\n    Error: connect ETIMEDOUT 192.0.2.1:443\nNode.js v24";
+const dsCalls = (sb) => sb.calls().filter((c) => c.startsWith('ds ')).length;
+
+test('retro-launch: ds failing on a connection retries and, if it never connects, logs the whole error on one line', () => {
+  const sb = setup([], { dsFails: true, dsStderr: CONNECT_ERROR });
+  assert.equal(sb.launch().code, 1);
+  assert.equal(dsCalls(sb), 3);
+  const lines = sb.read('launch.log').trim().split('\n');
+  assert.equal(lines.length, 3);
+  assert.match(lines[0], /RETRY: ds slotted try 1 of 3 could not connect \((fetch failed|ETIMEDOUT)\)/);
+  assert.match(lines[2], /FAIL: ds slotted \(try 3 of 3\): TypeError: fetch failed \| \[cause\]: AggregateError \[ETIMEDOUT\]: \| Error: connect ETIMEDOUT 192\.0\.2\.1:443 \| Node\.js v24$/);
+});
+
+test('retro-launch: a connection failure that clears on the retry carries on and launches', () => {
+  const sb = setup([slot('retro-2026-10-26')], { dsFailTimes: 1, dsStderr: CONNECT_ERROR });
+  assert.equal(sb.launch().code, 0);
+  assert.equal(dsCalls(sb), 2);
+  assert.match(sb.read('launch.log'), /RETRY: ds slotted try 1 of 3[\s\S]*OK: launched retro-2026-10-26/);
+});
+
+test('retro-launch: any other ds failure is not retried, and its full error is logged', () => {
+  const sb = setup([], { dsFails: true, dsStderr: 'Error: D1 query failed: [{"code":7500}]\n    at query (d1.mjs:27:1)' });
+  assert.equal(sb.launch().code, 1);
+  assert.equal(dsCalls(sb), 1);
+  assert.match(sb.read('launch.log'), /FAIL: ds slotted \(try 1 of 3\): Error: D1 query failed: \[\{"code":7500\}\] \| at query \(d1\.mjs:27:1\)/);
 });

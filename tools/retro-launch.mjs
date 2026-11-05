@@ -17,6 +17,10 @@ const STATE = process.env.RETRO_LAUNCH_STATE || `${HOME}/.claude/hooks/retro-lau
 const CLAUDE = process.env.RETRO_CLAUDE || 'claude';
 const WAIT_S = Number(process.env.RETRO_WAIT_S ?? 90); // how long Remote Control gets to come up
 const MAX_TRIES = 3;
+const DS_TRIES = 3;
+const DS_WAIT_S = 15;
+// ds reaches the database over the network; these are connections that never came up (about 4% of runs).
+const TRANSIENT = /fetch failed|ETIMEDOUT|ENETUNREACH|EHOSTUNREACH|ECONNRESET|EAI_AGAIN|UND_ERR_CONNECT_TIMEOUT/;
 
 const log = (m) => appendFileSync(LOG, `${new Date().toISOString()} ${m}\n`);
 const notify = (m) => { try { execFileSync(NOTIFY, [m]); } catch { log('telegram send failed'); } };
@@ -29,9 +33,19 @@ const pretty = (ymd) => new Date(`${ymd}T12:00:00`).toLocaleDateString('en-US', 
 const state = existsSync(STATE) ? JSON.parse(readFileSync(STATE, 'utf8')) : { launched: {}, failed: {} };
 const save = () => writeFileSync(STATE, JSON.stringify(state, null, 2));
 
-let slotted;
-try { slotted = JSON.parse(execFileSync(process.execPath, [DS, 'slotted', 'retro-', '--json'], { encoding: 'utf8' })); }
-catch (e) { log(`FAIL: ds slotted: ${e.message.split('\n')[0]}`); process.exit(1); }
+// The whole error goes in the log, on one line so the log stays one event per line.
+function readSlotted() {
+  for (let attempt = 1; ; attempt++) {
+    try { return JSON.parse(execFileSync(process.execPath, [DS, 'slotted', 'retro-', '--json'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })); }
+    catch (e) {
+      const err = (String(e.stderr || '').trim() || e.message).replace(/\s*\n\s*/g, ' | ');
+      if (attempt >= DS_TRIES || !TRANSIENT.test(err)) { log(`FAIL: ds slotted (try ${attempt} of ${DS_TRIES}): ${err}`); process.exit(1); }
+      log(`RETRY: ds slotted try ${attempt} of ${DS_TRIES} could not connect (${err.match(TRANSIENT)[0]})`);
+      sleep(DS_WAIT_S);
+    }
+  }
+}
+const slotted = readSlotted();
 
 for (const s of slotted.filter((x) => /^retro-\d{4}-\d{2}-\d{2}$/.test(x.taskId))) {
   if (state.launched[s.taskId]) continue;
