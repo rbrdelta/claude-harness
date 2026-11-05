@@ -36,7 +36,7 @@ const save = () => writeFileSync(STATE, JSON.stringify(state, null, 2));
 // The whole error goes in the log, on one line so the log stays one event per line.
 function readSlotted() {
   for (let attempt = 1; ; attempt++) {
-    try { return JSON.parse(execFileSync(process.execPath, [DS, 'slotted', 'retro-', '--json'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })); }
+    try { return JSON.parse(execFileSync(process.execPath, [DS, 'slotted', '', '--json'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })); }
     catch (e) {
       const err = (String(e.stderr || '').trim() || e.message).replace(/\s*\n\s*/g, ' | ');
       if (attempt >= DS_TRIES || !TRANSIENT.test(err)) { log(`FAIL: ds slotted (try ${attempt} of ${DS_TRIES}): ${err}`); process.exit(1); }
@@ -46,8 +46,21 @@ function readSlotted() {
   }
 }
 const slotted = readSlotted();
+const RETRO_ID = /^retro-\d{4}-\d{2}-\d{2}$/;
 
-for (const s of slotted.filter((x) => /^retro-\d{4}-\d{2}-\d{2}$/.test(x.taskId))) {
+// A retro slotted from a work item that isn't a retro-<date> one (a replaced item, say): nothing can be launched
+// for it, so say so once rather than skip it in silence. The link holds no pointer to a replacement to follow.
+state.warned ||= {};
+for (const s of slotted.filter((x) => !RETRO_ID.test(x.taskId) && /^\s*(weekly\s+)?retro\b/i.test(x.text || ''))) {
+  const key = `${s.date}/${s.priId}`;
+  if (state.warned[key]) continue;
+  state.warned[key] = new Date().toISOString();
+  save();
+  log(`WARN: "${s.text}" is slotted for ${s.date} but linked to ${s.taskId}, not a retro-<date> item; no session started`);
+  notify(`"${s.text}" is on your Daily Standard for ${pretty(s.date)}, but it's linked to a work item that isn't the current retro, so no session was started. Pick the retro from the list again, or start /retro yourself.`);
+}
+
+for (const s of slotted.filter((x) => RETRO_ID.test(x.taskId))) {
   if (state.launched[s.taskId]) continue;
   const tries = state.failed[s.taskId] || 0;
   if (tries >= MAX_TRIES) continue;

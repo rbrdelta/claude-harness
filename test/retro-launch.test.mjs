@@ -50,11 +50,34 @@ test('retro-launch: idempotent — a second run, or the retro moved to another b
   assert.equal(again.notes().length, 0);
 });
 
-test('retro-launch: only retro-YYYY-MM-DD items; nothing slotted means nothing started or sent', () => {
-  const sb = setup([slot('retro-notes-x'), slot('abc123')]);
+test('retro-launch: only retro-YYYY-MM-DD items start a session; other slotted work and an empty list start nothing and send nothing', () => {
+  const sb = setup([{ ...slot('abc123'), text: 'Fix the car' }, { ...slot('retro-notes-x'), text: 'Notes on last week' }]);
   assert.equal(sb.launch().code, 0);
+  assert.ok(sb.calls().some((c) => c === "ds slotted  --json"), 'reads every linked slot, so a retro on a replaced item is seen');
   assert.ok(!sb.calls().some((c) => c.includes('new-session')));
   assert.equal(sb.notes().length, 0);
+  const none = setup([]);
+  assert.equal(none.launch().code, 0);
+  assert.equal(none.notes().length, 0);
+});
+
+test('retro-launch: a retro slotted from a replaced work item warns once, in the log and on Telegram, and starts nothing', () => {
+  const sb = setup([{ ...slot('47dca45aff92'), text: 'Retro — week of Oct 26' }]);
+  sb.launch();
+  sb.launch();
+  assert.ok(!sb.calls().some((c) => c.includes('new-session')));
+  assert.equal(sb.notes().length, 1);
+  assert.match(sb.notes()[0], /^"Retro — week of Oct 26" is on your Daily Standard for Wed, Oct 28, but it's linked to a work item that isn't the current retro, so no session was started\./);
+  assert.equal(sb.read('launch.log').match(/WARN: /g).length, 1);
+  assert.match(sb.read('launch.log'), /WARN: "Retro — week of Oct 26" is slotted for 2026-10-28 but linked to 47dca45aff92/);
+});
+
+test('retro-launch: a state file from before warnings existed still works; a real retro alongside a stale one launches', () => {
+  const sb = setup([{ ...slot('47dca45aff92'), priId: 'p2', text: 'Retro' }, slot('retro-2026-10-26')]);
+  sb.write('state.json', JSON.stringify({ launched: {}, failed: {} }));
+  assert.equal(sb.launch().code, 0);
+  assert.equal(sb.state().launched['retro-2026-10-26'].url, URL1);
+  assert.equal(sb.notes().length, 2);
 });
 
 test('retro-launch: a session already running under the name is adopted, not started twice', () => {
