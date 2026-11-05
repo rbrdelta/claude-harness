@@ -9,19 +9,20 @@ This is personal AI-skills practice, not a template. Paths are absolute (`/home/
 ```
 hooks/        SessionStart, PostStop, PostToolUse — health, session stats, tool-use logging
 triggers/     scheduled jobs (vault sync, weekly reviews, NorthStar check, digest)
-systemd/      service + timer units for the same jobs (alt. to cron)
-tasks/        task system — SCHEMA.md, compile-task.ts (compiles to headless sprint scripts)
-crontab.txt   active local cron schedule (8h vault sync, 3h Notion sync, 5min remote-control health)
+systemd/      service + timer units that schedule those jobs (8h vault sync, 6h Notion sync, weekly agents)
+tools/        session and vault digests, retro launcher, Telegram notifier
+test/         sandboxed tests, run by ./verify.sh
+crontab.txt   the one remaining cron line (5min remote-control health)
 ```
 
 The hooks symlink in from `~/.claude/hooks/` so the running agent and the repo are the same files.
 
 ## Architecture in one line
 
-Scheduled reasoning runs via local cron using `claude -p` (not RemoteTrigger API). Local cron is proven durable; remote triggers reserved for on-demand/mobile work only.
+Scheduled reasoning runs on local systemd user timers using `claude -p` (not RemoteTrigger API). Local scheduling is proven durable; remote triggers reserved for on-demand/mobile work only.
 
 ```
-claude -p "$PROMPT" --model claude-sonnet-4-6 \
+claude -p "$PROMPT" --model sonnet \
   --allowedTools "Bash,Read,Write,Edit,Glob,Grep" \
   --permission-mode bypassPermissions
 ```
@@ -36,7 +37,7 @@ claude -p "$PROMPT" --model claude-sonnet-4-6 \
 
 ## Standing rules
 
-- Use local cron + `claude -p` for scheduled agent jobs; don't reach for RemoteTrigger.
+- Use systemd user timers + `claude -p` for scheduled agent jobs; don't reach for RemoteTrigger.
 - Triggers set `WORK_DIR` to the relevant project for session isolation.
 - Never ship detection without remediation — verify the full trigger → detect → act → verify loop.
 

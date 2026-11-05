@@ -122,6 +122,7 @@ test('weekly-digest: success means a digest note dated today exists, not just ex
   sb.write('claude-behavior.sh', `mkdir -p "$HOME/vault/Inbox"; echo "# d" > "$HOME/vault/Inbox/Weekly Digest — $(date +%Y-%m-%d).md"`);
   sb.run('bash', [s]);
   assert.match(log(sb, 'weekly-digest'), /advice-expiry check ran\n.*OK: line one\n$/);
+  assert.ok(sb.claudeCalls().every((c) => c.includes('[--model] [sonnet]')), 'an alias, not a pinned id');
   const [p] = sb.prompts();
   assert.match(p, /Verify inherited rows against the territory/);
   assert.match(p, /body of work/);
@@ -140,10 +141,18 @@ test('weekly-northstar-check: logs OK on a clean run and FAIL with the exit code
   const sb = base();
   const s = sb.copyScript('triggers/weekly-northstar-check.sh', 'bin/ns.sh');
   sb.run('bash', [s]);
-  assert.match(log(sb, 'weekly-northstar-check'), /OK: line one/);
+  assert.match(log(sb, 'weekly-northstar-check'), /OK: final summary/);
+  assert.ok(sb.claudeCalls()[0].includes('[--model] [sonnet]'), 'an alias, not a pinned id');
   assert.match(sb.prompts()[0], /updated within the last 7 days/);
   sb.run('bash', [s], { env: { FAKE_CLAUDE_EXIT: '1' } });
   assert.match(log(sb, 'weekly-northstar-check'), /FAIL \(exit 1\)/);
+});
+
+test('weekly-northstar-check: the OK summary is the agent\'s closing line, not a CLI warning printed before it', () => {
+  const sb = base();
+  const s = sb.copyScript('triggers/weekly-northstar-check.sh', 'bin/ns.sh');
+  sb.run('bash', [s], { env: { FAKE_CLAUDE_OUT: 'Permission deny rule: some warning\n\nNorthStar is fresh. Logged OK.\n\n' } });
+  assert.match(log(sb, 'weekly-northstar-check'), /OK: NorthStar is fresh\. Logged OK\.\n$/);
 });
 
 // --- Weekly retro prep --------------------------------------------------------------------------

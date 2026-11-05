@@ -4,7 +4,6 @@
   "description": "rbr01 agentic harness",
   "main": "index.js",
   "scripts": {
-    "compile": "npx tsx compile-task.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {

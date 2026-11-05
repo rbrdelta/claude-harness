@@ -57,7 +57,7 @@ OUTPUT_FILE="$OUTPUT_DIR/weekly-digest-$(date +%Y-%m-%d).txt"
 mkdir -p "$OUTPUT_DIR"
 
 OUTPUT=$(cd "$WORK_DIR" && claude -p "$PROMPT" \
-    --model claude-sonnet-4-6 \
+    --model sonnet \
     --allowedTools "Bash,Read,Write,Edit,Glob,Grep" \
     --permission-mode bypassPermissions \
     2>&1)
@@ -65,8 +65,6 @@ EXIT_CODE=$?
 
 echo "$OUTPUT" > "$OUTPUT_FILE"
 
-# July window-pace gauge (deterministic; self-expires Jul 31). Append the ground-truth
-# window count to the digest note the agent just wrote (if it exists).
 DIGEST_NOTE="/mnt/c/MCP/Inbox/Weekly Digest — $(date +%Y-%m-%d).md"
 
 # Standing-advice expiry check (deterministic). Surfaces register rows past their

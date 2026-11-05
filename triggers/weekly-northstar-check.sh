@@ -55,7 +55,7 @@ OUTPUT_FILE="$OUTPUT_DIR/northstar-check-$(date +%Y-%m-%d).txt"
 mkdir -p "$OUTPUT_DIR"
 
 OUTPUT=$(cd "$WORK_DIR" && claude -p "$PROMPT" \
-    --model claude-sonnet-4-6 \
+    --model sonnet \
     --allowedTools "Bash,Read,Write,Edit,Glob,Grep" \
     --permission-mode bypassPermissions \
     2>&1)
@@ -64,7 +64,8 @@ EXIT_CODE=$?
 echo "$OUTPUT" > "$OUTPUT_FILE"
 
 if [ $EXIT_CODE -eq 0 ]; then
-    SUMMARY=$(echo "$OUTPUT" | tail -3 | head -1)
+    # The agent's closing line. CLI warnings land in OUTPUT too, ahead of it.
+    SUMMARY=$(echo "$OUTPUT" | grep -v '^[[:space:]]*$' | tail -1)
     log "OK: $SUMMARY"
 else
     log "FAIL (exit $EXIT_CODE): $(echo "$OUTPUT" | tail -3 | tr '\n' ' ')"

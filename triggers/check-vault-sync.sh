@@ -43,7 +43,7 @@ warnings=""
 w=$(check_source "CLAUDE.AI SYNC" "$HOME/.claude/hooks/vault-sync.log" 24)
 [ -n "$w" ] && warnings="$warnings$w. "
 
-# Notion — cron daily, stale after 48h
+# Notion — every 6h, stale after 48h
 w=$(check_source "NOTION SYNC" "$HOME/.claude/hooks/notion-sync.log" 48)
 [ -n "$w" ] && warnings="$warnings$w. "
 
