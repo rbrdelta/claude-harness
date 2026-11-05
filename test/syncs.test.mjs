@@ -119,22 +119,48 @@ test('notion-sync: no token file or an empty one skips; otherwise runs npm run n
   assert.match(log(sb, 'notion-sync'), /OK: \{"imported":15,"updated":0\}/);
 });
 
-test('notion-sync: a 401/unauthorized failure logs AUTH_EXPIRED and blanks the token file', () => {
+test('notion-sync: a real 401 from the importer logs AUTH_EXPIRED and leaves the token file exactly as it was', () => {
   const sb = sandbox();
   const s = notionSync(sb);
-  sb.write('.notion_token', 'ntn_x');
-  sb.run('bash', [s], { env: { FAKE_NPM_OUT: 'APIResponseError: Unauthorized', FAKE_NPM_EXIT: '1' } });
+  sb.write('.notion_token', 'ntn_x\n');
+  sb.run('bash', [s], { env: { FAKE_NPM_OUT: 'Fatal: Error: Auth failed. Check your NOTION_TOKEN.', FAKE_NPM_EXIT: '1' } });
   assert.match(log(sb, 'notion-sync'), /AUTH_EXPIRED: Notion token is no longer valid/);
-  assert.equal(sb.read('.notion_token').trim(), '');
+  assert.equal(sb.read('.notion_token'), 'ntn_x\n');
+  assert.equal(sb.calls().filter((c) => c.startsWith('npm')).length, 1, 'a dead token is not retried');
 });
 
-test('notion-sync: other failures log FAIL and keep the token', () => {
+test('notion-sync: 401, unauthorized or forbidden anywhere else in the output is not an auth failure; the token stays', () => {
+  for (const out of ['Importing "HTTP 401 unauthorized notes"\nFatal: Error: boom', 'Fatal: Error: Notion API 403: {"code":"restricted_resource","message":"Forbidden"}', 'invalid token in page body\nFatal: Error: bad JSON']) {
+    const sb = sandbox();
+    const s = notionSync(sb);
+    sb.write('.notion_token', 'ntn_x');
+    sb.run('bash', [s], { env: { FAKE_NPM_OUT: out, FAKE_NPM_EXIT: '1' } });
+    assert.doesNotMatch(log(sb, 'notion-sync'), /AUTH_EXPIRED/);
+    assert.match(log(sb, 'notion-sync'), /FAIL \(exit 1\): /);
+    assert.equal(sb.read('.notion_token'), 'ntn_x');
+  }
+});
+
+test('notion-sync: a connection failure gets one retry; a second failure logs FAIL with the error, not npm notices, and keeps the token', () => {
   const sb = sandbox();
   const s = notionSync(sb);
   sb.write('.notion_token', 'ntn_x');
-  sb.run('bash', [s], { env: { FAKE_NPM_OUT: 'ETIMEDOUT', FAKE_NPM_EXIT: '1' } });
-  assert.match(log(sb, 'notion-sync'), /FAIL \(exit 1\): ETIMEDOUT/);
+  sb.run('bash', [s], { env: { FAKE_NPM_OUT: 'Fatal: AggregateError\nnpm notice New version\nnpm notice Changelog\nnpm notice To update', FAKE_NPM_EXIT: '1', NOTION_RETRY_WAIT_S: '0' } });
+  assert.equal(sb.calls().filter((c) => c.startsWith('npm')).length, 2);
+  assert.match(log(sb, 'notion-sync'), /RETRY: connection problem, trying once more: Fatal: AggregateError/);
+  assert.match(log(sb, 'notion-sync'), /FAIL \(exit 1\): .*Fatal: AggregateError/);
+  assert.doesNotMatch(log(sb, 'notion-sync'), /FAIL.*npm notice/);
   assert.equal(sb.read('.notion_token'), 'ntn_x');
+});
+
+test('notion-sync: a connection failure that clears on the retry logs OK', () => {
+  const sb = sandbox();
+  sb.write('projects/active/obsidian-mcp/package.json', '{}');
+  sb.shim('npm', `if [ -f "$HOME/tried" ]; then echo '{"imported":2}'; exit 0; fi; touch "$HOME/tried"; echo 'Fatal: Error: Timeout'; exit 1`);
+  const s = sb.copyScript('triggers/notion-sync.sh', 'bin/notion-sync.sh');
+  sb.write('.notion_token', 'ntn_x');
+  sb.run('bash', [s], { env: { NOTION_RETRY_WAIT_S: '0' } });
+  assert.match(log(sb, 'notion-sync'), /OK: \{"imported":2\}\n$/);
 });
 
 test('vault-reclassify: runs the local reclassifier on the vault and logs its JSON summary or the failure', () => {
