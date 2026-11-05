@@ -69,6 +69,9 @@ w=$(check_agent_job "JOB NEWS" "$HOME/.claude/hooks/job-news.log" 38)
 # @Claude phone requests (2026-11-03): it logs only when there is a request, so a quiet stretch is never stale; only a failed last run warns.
 w=$(check_agent_job "PHONE REQUESTS" "$HOME/.claude/hooks/phone-requests.log" 36500)
 [ -n "$w" ] && warnings="$warnings$w. "
+# Backlog worker (2026-11-05): logs an OK line every night even with nothing to do, so two quiet days means it stopped running
+w=$(check_agent_job "BACKLOG WORKER" "$HOME/.claude/hooks/backlog-worker.log" 2)
+[ -n "$w" ] && warnings="$warnings$w. "
 
 # --- 3b. Job scan results: name new / closed postings for 3 days after a scan ---
 JOB_SCAN_LOG="$HOME/.claude/hooks/job-scan.log"

@@ -1,0 +1,6 @@
+[Unit]
+Description=Backlog worker — finish the work items marked auto=yes with nobody at the keyboard
+
+[Service]
+Type=oneshot
+ExecStart=/home/rbr01/.claude/hooks/backlog-worker.sh
