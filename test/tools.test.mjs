@@ -126,6 +126,28 @@ test('vault-digest: long notes keep the opening and the end; over --max-chars th
   assert.doesNotMatch(cut, /Cohort plan/);
 });
 
+test('vault-digest: the cut starts at a note header whichever note is newest, even when the newest alone is over the limit', () => {
+  const long = 'START' + 'x'.repeat(9000) + 'END';
+  // Long note newest: only its header and end fit.
+  let sb = vaultRoot();
+  sb.write('vault/Sources/Notion/long.md', fm([`title: Long one`, `updated: '${iso(0.5)}'`], long));
+  let cut = vdigest(sb, '--max-chars', '200');
+  assert.match(cut, /^\[older notes cut to fit\]\n=== Notion page: Long one \(edited [^)]*\) ===\nx+END\n$/);
+  assert.ok(cut.trimEnd().length <= 200, `kept to the limit, got ${cut.length}`);
+  assert.doesNotMatch(cut, /Cohort plan|phone idea/);
+  // Short note newest: it stays whole and the long one is dropped.
+  sb = vaultRoot();
+  sb.write('vault/Sources/Notion/long.md', fm([`title: Long one`, `updated: '${iso(1.5)}'`], long));
+  cut = vdigest(sb, '--max-chars', '200');
+  assert.match(cut, /^\[older notes cut to fit\]\n=== phone note: idea \(ab12\) .*\nphone idea\n$/);
+  assert.doesNotMatch(cut, /Long one/);
+  // A body line that looks like a header is not mistaken for one, and several notes keep their order.
+  sb = vaultRoot();
+  sb.write('vault/Sources/Notion/rule.md', fm([`title: Ruled`, `updated: '${iso(0.5)}'`], 'first\n=== not a header\nlast'));
+  cut = vdigest(sb, '--max-chars', '200');
+  assert.match(cut, /^\[older notes cut to fit\]\n=== phone note: idea \(ab12\) .*\nphone idea\n\n=== Notion page: Ruled .*\nfirst\n=== not a header\nlast\n$/);
+});
+
 // --- approval-report.js ---
 test('approval-report: coverage mirrors the permission engine (Read covers Glob/Grep, Edit covers Write), counts denies, suggests rules seen twice', () => {
   const sb = sandbox();

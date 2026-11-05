@@ -53,6 +53,23 @@ def clip(body):
     return body[:1200] + "\n[... middle cut ...]\n" + body[-(PER_NOTE - 1200):]
 
 
+def fit(notes, limit):
+    """The newest notes that fit in limit, whole. Each note starts at its === header, so a reader
+    always knows what it is reading; a newest note too long to fit alone keeps its header and its end."""
+    marker = "[older notes cut to fit]"
+    kept, used = [], len(marker)
+    for note in reversed(notes):
+        if used + len(note) + 1 > limit:
+            break
+        kept.insert(0, note)
+        used += len(note) + 1
+    if not kept and notes:
+        head, _, body = notes[-1].partition("\n")
+        room = max(limit - used - len(head) - 2, 0)
+        kept = [head + "\n" + body[len(body) - room:]]
+    return "\n\n".join([marker + "\n" + kept[0]] + kept[1:]) if kept else marker
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--hours", type=float, default=26)
@@ -73,13 +90,11 @@ def main():
                 continue
             found.append((t, kind, field(fm, "title") or name, body))
     found.sort()
-    out = [f"{len(found)} notes edited in the last {a.hours:g} hours (claude.ai conversations, phone notes, Notion)."]
-    for t, kind, title, body in found:
-        out.append(f"\n=== {kind}: {title} (edited {datetime.fromtimestamp(t).strftime('%Y-%m-%d %H:%M')}) ===\n{clip(body)}")
-    text = "\n".join(out)
+    head = f"{len(found)} notes edited in the last {a.hours:g} hours (claude.ai conversations, phone notes, Notion)."
+    notes = [f"=== {kind}: {title} (edited {datetime.fromtimestamp(t).strftime('%Y-%m-%d %H:%M')}) ===\n{clip(body)}" for t, kind, title, body in found]
+    text = "\n\n".join([head] + notes)
     if len(text) > a.max_chars:
-        text = text[-a.max_chars:]  # newest last, so the cut drops the oldest
-        text = "[older notes cut to fit]\n" + text[text.find("\n=== ") + 1:]
+        text = fit(notes, a.max_chars)  # oldest first, so the cut drops the oldest
     print(text)
 
 
