@@ -416,6 +416,12 @@ test('harness-check: job scan — names new/closed postings for 3 days, silent w
   sb = sandbox();
   sb.write('.claude/hooks/job-news.log', `${stamp(24 * 3)} OK: 12\n${stamp(1)} FAIL: run finished but note was not written\n`);
   assert.match(harness(sb).out, /JOB NEWS: LAST RUN FAILED/);
+  sb = sandbox();
+  sb.write('.claude/hooks/events-list.log', `${stamp(24 * 10)} OK: added=1 confirmed=0 removed=0 threads=2\n`);
+  assert.match(harness(sb).out, /EVENTS LIST: STALE \(10d\)/);
+  sb = sandbox();
+  sb.write('.claude/hooks/events-list.log', `${stamp(24 * 2)} OK: added=1 confirmed=0 removed=0 threads=2\n${stamp(1)} FAIL: note shrank from 9000 to 100 bytes (note restored from x)\n`);
+  assert.match(harness(sb).out, /EVENTS LIST: LAST RUN FAILED/);
 });
 
 // --- Delete guard, uncommitted warning, verify reminder ----------------------------------------

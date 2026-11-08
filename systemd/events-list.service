@@ -1,0 +1,6 @@
+[Unit]
+Description=Weekly community and events list refresh (claude -p)
+
+[Service]
+Type=oneshot
+ExecStart=/home/rbr01/.claude/hooks/events-list.sh

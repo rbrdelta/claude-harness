@@ -66,6 +66,9 @@ w=$(check_agent_job "JOB SCAN" "$HOME/.claude/hooks/job-scan.log" 9)
 [ -n "$w" ] && warnings="$warnings$w. "
 w=$(check_agent_job "JOB NEWS" "$HOME/.claude/hooks/job-news.log" 38)
 [ -n "$w" ] && warnings="$warnings$w. "
+# Community and events list (2026-11-08): weekly on Sunday, so 9 days without an OK means it stopped
+w=$(check_agent_job "EVENTS LIST" "$HOME/.claude/hooks/events-list.log" 9)
+[ -n "$w" ] && warnings="$warnings$w. "
 # @Claude phone requests (2026-11-03): it logs only when there is a request, so a quiet stretch is never stale; only a failed last run warns.
 w=$(check_agent_job "PHONE REQUESTS" "$HOME/.claude/hooks/phone-requests.log" 36500)
 [ -n "$w" ] && warnings="$warnings$w. "

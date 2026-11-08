@@ -1,0 +1,10 @@
+[Unit]
+Description=Weekly community and events list refresh — Sunday 08:00, with catch-up
+
+[Timer]
+OnCalendar=Sun *-*-* 08:00
+Persistent=true
+Unit=events-list.service
+
+[Install]
+WantedBy=timers.target

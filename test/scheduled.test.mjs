@@ -395,6 +395,62 @@ test('job-news: Opus with web search, prompt forbids Excel writes and Confidenti
   assert.match(log(sb, 'job-news'), /FAIL \(exit 1\)/);
 });
 
+// --- Community and events list, weekly (2026-11-08) ---------------------------------------------
+const EVENTS_NOTE = `---\ncreated: 2026-11-07\nupdated: 2026-11-01\n---\n\n# Community and Events List\n\n## What changed this week\n\n- old\n\n## Threads to keep checking\n\n- Daniel: a thread he added\n\n${'| row | event |\n'.repeat(40)}`;
+function events(sb) {
+  sb.write('vault/Inbox/Community and Events List.md', EVENTS_NOTE);
+  return { s: sb.copyScript('triggers/events-list.sh', 'bin/events-list.sh'), env: { EVENTS_NOTE: sb.path('vault/Inbox/Community and Events List.md') } };
+}
+const noteRel = 'vault/Inbox/Community and Events List.md';
+
+test('events-list: Opus with web search, no Bash; prompt edits only the note, never registers or contacts, keeps Daniel\'s lines; runs in the note folder', () => {
+  const sb = base();
+  const { s, env } = events(sb);
+  sb.write('claude-behavior.sh', `sed -i "s/^updated: .*/updated: $(date +%Y-%m-%d)/" "$EVENTS_NOTE"`);
+  sb.run('bash', [s], { env: { ...env, FAKE_CLAUDE_OUT: 'added=3 confirmed=1 removed=2 threads=4' } });
+  assert.match(log(sb, 'events-list'), /START\n.*OK: added=3 confirmed=1 removed=2 threads=4\n$/);
+  const call = sb.claudeCalls()[0];
+  assert.ok(call.includes('[--model] [opus]'), 'an alias, not a pinned id');
+  assert.ok(call.includes('[--allowedTools] [Read,Edit,Write,Glob,Grep,WebSearch,WebFetch]'));
+  assert.ok(sb.calls().some((c) => c.includes(`pwd=${sb.path('vault/Inbox')}`)));
+  const [p] = sb.prompts();
+  assert.match(p, /Edit only this file: ".*Community and Events List\.md"/);
+  assert.match(p, /Never register, sign up, RSVP, post, comment, log in, or contact anyone/);
+  assert.match(p, /never read anything under \/mnt\/c\/MCP\/Confidential\//i);
+  assert.match(p, /any line starting "Daniel:"/);
+  assert.match(p, /Only certain facts/);
+  assert.ok(sb.exists(`.claude/logs/events-list-backup-${today()}.md`), 'backed up before the run');
+});
+
+test('events-list: restores the backup when the run fails, the note shrinks, the threads section goes, or updated: is not today', () => {
+  const sb = base();
+  const { s, env } = events(sb);
+  const cases = [
+    [{ FAKE_CLAUDE_EXIT: '1' }, '', /FAIL: claude exit 1/],
+    [{}, '', /FAIL: frontmatter updated: is not \d{4}-\d{2}-\d{2}/],
+    [{}, `printf -- '---\\nupdated: %s\\n---\\n## Threads to keep checking\\n' "$(date +%Y-%m-%d)" > "$EVENTS_NOTE"`, /FAIL: note shrank from \d+ to \d+ bytes/],
+    [{}, `sed -i -e "s/^updated: .*/updated: $(date +%Y-%m-%d)/" -e 's/^## Threads to keep checking/## Threads/' "$EVENTS_NOTE"`, /FAIL: Threads to keep checking section is gone/],
+  ];
+  for (const [extra, behavior, re] of cases) {
+    sb.write(noteRel, EVENTS_NOTE);
+    sb.write('claude-behavior.sh', behavior);
+    const r = sb.run('bash', [s], { env: { ...env, ...extra } });
+    assert.equal(r.code, 1);
+    assert.match(log(sb, 'events-list'), re);
+    assert.match(log(sb, 'events-list'), /note restored from .*events-list-backup-/);
+    assert.equal(sb.read(noteRel), EVENTS_NOTE, 'note is back to what it was before the run');
+  }
+});
+
+test('events-list: a missing note fails before any model call', () => {
+  const sb = base();
+  const s = sb.copyScript('triggers/events-list.sh', 'bin/events-list.sh');
+  const r = sb.run('bash', [s], { env: { EVENTS_NOTE: sb.path('vault/nowhere.md') } });
+  assert.equal(r.code, 1);
+  assert.match(log(sb, 'events-list'), /FAIL: .*nowhere\.md missing/);
+  assert.equal(sb.claudeCalls().length, 0);
+});
+
 // --- @Claude requests from phone notes (2026-11-03) ---------------------------------------------
 // Stand-in requests.mjs: `list --json` prints FAKE_PENDING pending requests; FAKE_LIST_FAIL makes it fail.
 function phoneReq(sb) {
