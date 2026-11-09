@@ -1,0 +1,6 @@
+[Unit]
+Description=Outreach follow-ups due (job search cadence to the Tactical checklist)
+
+[Service]
+Type=oneshot
+ExecStart=/home/rbr01/.claude/hooks/outreach-due.sh

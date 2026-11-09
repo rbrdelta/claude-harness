@@ -374,6 +374,25 @@ test('job-scan: runs job_scan.py in the job-search folder, logs its last line as
   assert.match(log(sb, 'job-scan'), /FAIL: .*job_scan\.py missing/);
 });
 
+test('outreach-due: pushes each due follow-up to Tactical and records its key (outreach_view.py skips recorded keys), FAIL when a Tactical write fails, no model call', () => {
+  const sb = base();
+  const dir = sb.path('jobsearch');
+  sb.write('jobsearch/outreach_view.py', 'import sys\nprint("Ramp|next\\tRamp: message Yeno Konya (Sam quiet 5 days)")\nprint("Hex|next\\tHex: message Olivia Koshy (Carlos quiet 4 days)")');
+  sb.write('bin/tactical.mjs', 'import fs from "node:fs"; if (process.env.FAKE_TACTICAL_FAIL) process.exit(1); fs.appendFileSync(process.env.TACTICAL_LOG, process.argv.slice(2).join(" ") + "\\n");');
+  const s = sb.copyScript('triggers/outreach-due.sh', 'bin/outreach-due.sh');
+  const env = { JOB_SEARCH_DIR: dir, TACTICAL_ADD: sb.path('bin/tactical.mjs'), TACTICAL_LOG: sb.path('tactical.txt'), OUTREACH_STATE: sb.path('state.txt') };
+  sb.run('bash', [s], { env });
+  assert.match(log(sb, 'outreach-due'), /START\n.*OK: due=2 pushed=2\n$/);
+  assert.match(sb.read('tactical.txt'), /Follow up, Ramp: message Yeno Konya .* --from Outreach cadence\n/);
+  assert.equal(sb.read('state.txt'), 'Ramp|next\nHex|next\n');
+  assert.equal(sb.claudeCalls().length, 0);
+  const r = sb.run('bash', [s], { env: { ...env, FAKE_TACTICAL_FAIL: '1' } });
+  assert.equal(r.code, 1);
+  assert.match(log(sb, 'outreach-due'), /FAIL: due=2 pushed=0 failed=2/);
+  sb.run('bash', [s], { env: { ...env, JOB_SEARCH_DIR: sb.path('nowhere') } });
+  assert.match(log(sb, 'outreach-due'), /FAIL: .*outreach_view\.py missing/);
+});
+
 test('job-news: Opus with web search, prompt forbids Excel writes and Confidential; OK only when this month\'s note exists', () => {
   const sb = base();
   const dir = sb.path('jobsearch');

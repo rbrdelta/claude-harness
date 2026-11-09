@@ -1,0 +1,10 @@
+[Unit]
+Description=Outreach follow-ups due — daily 07:15, with catch-up
+
+[Timer]
+OnCalendar=*-*-* 07:15
+Persistent=true
+Unit=outreach-due.service
+
+[Install]
+WantedBy=timers.target
