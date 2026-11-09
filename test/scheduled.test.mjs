@@ -75,6 +75,8 @@ test('pm-run overnight: Opus, full /pm prompt that reads the vault sources and s
   assert.doesNotMatch(p, /off-mission \(drop it/, 'the run never drops an item for fitting no workstream');
   assert.match(p, /sections, each only if non-empty: Gaps/);
   assert.match(p, /Start with Focus: today's one thing/, 'the PM note leads with the focus (2026-11-03 retro)');
+  assert.match(p, /Then Today's job-search input/, 'every day names one job-search input he can do from his phone (2026-11-09 retro)');
+  assert.match(p, /The first run each day \(06:00\) always writes an entry with this line/, 'the daily input line is written even on a no-change day (2026-11-09 retro)');
   assert.match(p, /WEEKLY OUTCOMES AND THE ONE THING/);
   assert.match(p, /\$DS one-set <id> --by pm/);
   assert.match(p, /never replaced: it stays until done/);
