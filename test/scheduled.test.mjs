@@ -80,6 +80,8 @@ test('pm-run overnight: Opus, full /pm prompt that reads the vault sources and s
   assert.match(p, /WEEKLY OUTCOMES AND THE ONE THING/);
   assert.match(p, /\$DS one-set <id> --by pm/);
   assert.match(p, /never replaced: it stays until done/);
+  assert.match(p, /A remark about when he will do something \('we'll resume prep tomorrow'\) is not an override/, 'a scheduling remark does not take the one thing (2026-11-10)');
+  assert.match(p, /should this replace the one thing\?/);
   assert.match(p, /never write or change them yourself/);
   assert.match(p, /no cohorts/);
   assert.ok(sb.claudeCalls()[0].includes('[--model] [opus]'));
