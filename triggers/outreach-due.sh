@@ -1,7 +1,7 @@
 #!/bin/bash
 # Outreach follow-ups — systemd user timer outreach-due.timer (daily 07:15, Persistent catch-up).
 # No model: runs outreach_view.py --due in the vault job-search folder, which reads the Excel
-# tracker (read-only), rewrites the "Due today" block of the outreach plan note, and prints
+# tracker (read-only), rewrites the send list in the week note and the outreach plan's status block, and prints
 # follow-ups due that were not pushed before (key<TAB>text). Each goes on Daniel's Tactical
 # checklist in Phone Notes; its key is then recorded so it is pushed once.
 # Log lines: "<ts> OK: due=N pushed=N" / "<ts> FAIL ...".
