@@ -418,6 +418,33 @@ test('job-news: Opus with web search, prompt forbids Excel writes and Confidenti
   assert.match(log(sb, 'job-news'), /FAIL \(exit 1\)/);
 });
 
+// --- Hiring posts, weekly (2026-11-12) ---------------------------------------------------------
+test('job-posts: Opus with web search; prompt forbids Excel writes, contact and Confidential, never grades; OK only when the note is written today', () => {
+  const sb = base();
+  const dir = sb.path('jobsearch');
+  sb.write('jobsearch/.keep', '');
+  const s = sb.copyScript('triggers/job-posts.sh', 'bin/job-posts.sh');
+  sb.run('bash', [s], { env: { JOB_SEARCH_DIR: dir } });
+  assert.match(log(sb, 'job-posts'), /FAIL: run finished but .*Hiring posts — weekly\.md was not written/);
+  const [p] = sb.prompts();
+  assert.match(p, /Never write or edit the Excel tracker/);
+  assert.match(p, /never read anything under \/mnt\/c\/MCP\/Confidential\//);
+  assert.match(p, /Never register, sign up, post, comment, log in, or contact anyone/);
+  assert.match(p, /Do not grade or rank seats/);
+  assert.match(p, /Only certain facts/);
+  const call = sb.claudeCalls()[0];
+  assert.ok(call.includes('[--model] [opus]'));
+  assert.ok(call.includes('WebSearch,WebFetch'));
+  sb.write('jobsearch/Hiring posts — weekly.md', '---\nupdated: 2020-01-01\n---\n');
+  sb.run('bash', [s], { env: { JOB_SEARCH_DIR: dir } });
+  assert.match(log(sb, 'job-posts'), /FAIL: note frontmatter updated: is not \d{4}-\d{2}-\d{2}/);
+  sb.write('claude-behavior.sh', `printf -- '---\\nupdated: %s\\n---\\n' "$(date +%Y-%m-%d)" > "${dir}/Hiring posts — weekly.md"`);
+  sb.run('bash', [s], { env: { JOB_SEARCH_DIR: dir, FAKE_CLAUDE_OUT: 'posts=4 new=2 tracked=2' } });
+  assert.match(log(sb, 'job-posts'), /OK: posts=4 new=2 tracked=2\n$/);
+  sb.run('bash', [s], { env: { JOB_SEARCH_DIR: dir, FAKE_CLAUDE_EXIT: '1' } });
+  assert.match(log(sb, 'job-posts'), /FAIL \(exit 1\)/);
+});
+
 // --- Community and events list, weekly (2026-11-08) ---------------------------------------------
 const EVENTS_NOTE = `---\ncreated: 2026-11-07\nupdated: 2026-11-01\n---\n\n# Community and Events List\n\n## What changed this week\n\n- old\n\n## Threads to keep checking\n\n- Daniel: a thread he added\n\n${'| row | event |\n'.repeat(40)}`;
 function events(sb) {

@@ -1,0 +1,6 @@
+[Unit]
+Description=Weekly hiring-posts search (claude -p)
+
+[Service]
+Type=oneshot
+ExecStart=/home/rbr01/.claude/hooks/job-posts.sh
