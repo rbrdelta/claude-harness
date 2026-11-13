@@ -1,8 +1,8 @@
 [Unit]
-Description=Weekly hiring-posts search — Mondays 07:30, with catch-up
+Description=Daily hiring-posts search — 07:30, with catch-up
 
 [Timer]
-OnCalendar=Mon *-*-* 07:30
+OnCalendar=*-*-* 07:30
 Persistent=true
 Unit=job-posts.service
 

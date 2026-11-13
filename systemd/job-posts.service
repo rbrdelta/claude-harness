@@ -1,5 +1,5 @@
 [Unit]
-Description=Weekly hiring-posts search (claude -p)
+Description=Daily hiring-posts search (claude -p)
 
 [Service]
 Type=oneshot
