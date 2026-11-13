@@ -1,7 +1,7 @@
 // Session hooks and the bridge watchdog: hooks/*.sh, run as real bash in a sandboxed HOME.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync, statSync, utimesSync } from 'node:fs';
 import { join } from 'node:path';
 import { sandbox, stamp, today, REPO } from './helpers.mjs';
 
@@ -123,6 +123,19 @@ test('harness-check: active projects — more than 10 uncommitted files, or no g
   assert.match(r.out, /NO GIT: loose\./);
   assert.doesNotMatch(r.out, /NO GIT: web/);
   assert.match(r.out, /DIRTY\(12\): web\/site\./);
+});
+
+test('harness-check: retro prep banner fires until a Retrospective newer than the prep exists, whatever its date', () => {
+  const sb = sandbox();
+  const env = { HARNESS_INBOX: sb.path('inbox') };
+  const prep = sb.write('inbox/Retro Prep — 2026-11-08.md', 'prep');
+  utimesSync(prep, new Date('2026-11-08T23:00:00'), new Date('2026-11-08T23:00:00'));
+  assert.match(harness(sb, env).out, /RETRO PREP READY \(2026-11-08\)/);
+  const old = sb.write('inbox/Retrospective — 2026-11-03.md', 'older retro');
+  utimesSync(old, new Date('2026-11-03T12:00:00'), new Date('2026-11-03T12:00:00'));
+  assert.match(harness(sb, env).out, /RETRO PREP READY \(2026-11-08\)/);
+  sb.write('inbox/Retrospective — 2026-11-09.md', 'walked the next day');
+  assert.doesNotMatch(harness(sb, env).out, /RETRO PREP READY/);
 });
 
 test('harness-check: remote-control health log over 1 MB is flagged', () => {

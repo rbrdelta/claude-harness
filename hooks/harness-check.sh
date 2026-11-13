@@ -142,16 +142,20 @@ if [ -f "$RC_LOG" ]; then
 fi
 
 # --- 5b. Retro prep ready ---
-# Banner if a Retro Prep doc exists with no matching Retrospective written after it.
-INBOX="/mnt/c/MCP/Inbox"
+# Banner if a Retro Prep doc exists with no Retrospective written after it. The prep is dated Sunday and
+# the retro is held Monday or later, so any Retrospective newer than the prep counts (the 11-08 prep was
+# walked in "Retrospective — 2026-11-09.md" and the banner kept firing on a same-date match).
+INBOX="${HARNESS_INBOX:-/mnt/c/MCP/Inbox}"
 latest_prep=$(ls -t "$INBOX"/Retro\ Prep\ —\ *.md 2>/dev/null | head -1)
 if [ -n "$latest_prep" ]; then
     prep_date=$(basename "$latest_prep" | sed -E 's/^Retro Prep — (.+)\.md$/\1/')
-    matching_retro="$INBOX/Retrospective — ${prep_date}.md"
     walked=false
-    if [ -f "$matching_retro" ] && [ "$matching_retro" -nt "$latest_prep" ]; then
-        walked=true
-    fi
+    for retro in "$INBOX"/Retrospective\ —\ *.md; do
+        if [ -f "$retro" ] && [ "$retro" -nt "$latest_prep" ]; then
+            walked=true
+            break
+        fi
+    done
     if ! $walked; then
         warnings="${warnings}RETRO PREP READY (${prep_date}): run /retro. "
     fi
