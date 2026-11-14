@@ -86,7 +86,7 @@ Write $ENTRY in this shape, plain markdown, only headings in bold text, bullets 
 **Last $DAYS days:** N threads (by source in one line). Previous run: <date or 'first run'>.
 **Talked about most** — one bullet per topic, most threads first: 'Topic: N threads (+k since last run / new)'. All topics, no cut.
 **Said most** — the concepts: 'concept: N mentions in M threads'.
-**What's emerging** (Claude's read) — two to four bullets: what is rising or new, what faded, a link between topics he may not have made. Mark it as your read; his conclusions stay his.
+**What's emerging** (Claude's read) — two to four bullets: what is rising or new, what faded, a link between topics he may not have made. Mark it as your read; his conclusions stay his. Say what drove a spike (a specific interview, application or deadline) and keep the read inside that context: a story that spikes while he prepares for one seat is top of mind for that seat, not his top story overall (2026-11-14: the HMM story led during the Actively prep because that seat is account-facing, not because it is his top example for every opportunity). Three days is a short window: never call something a lasting pattern from one window; compare with earlier runs in the counts instead.
 **Exploring or park?** — for each topic or concept that is getting real attention but serves none of the three outcomes and is not already a work item: one line naming it with its count and the question 'exploring for now, or park it?'. If nothing qualifies, write 'Nothing off-list this time.'
 Keep it under 30 lines. No preamble, no sign-off, no emojis, no shorthand or codes (plain names), nothing from the hidden topics, never his day job. Write nothing else."
 
