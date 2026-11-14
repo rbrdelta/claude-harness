@@ -8,7 +8,7 @@ RULES
 - Only Daniel's own words. Not Claude's, not a quoted speaker's. Notes on someone else's talk count only for his own reaction; if you can't tell, flag "Unclear attribution".
 - Quote verbatim, typos kept. Never rewrite or summarize into new phrasing.
 - DROP entirely anything from his day job (JPMC: CRM, his manager, his team, internal projects, interview prep about work; earlier jobs at shipping/logistics companies and Amazon Freight). Day-job material never becomes public content.
-- Flag "Personal" for family, health, money, relationships, job applications.
+- Flag "Personal" for family, health, money, relationships. Job search (applications, interviews, outreach, companies, roles) is NOT Personal: it is his top outcome and must reach the synthesis (Daniel, 2026-11-14).
 - Flag "Overlaps published" if it repeats a published piece: An Earned Null, Cost of Verification, Depth not Breadth, Emotional Resonance (intro, hearing test), field notes Batch approval, Conversation sync, Headless parity, Memory and the live channel.
 - These phrases are Claude's, never Daniel's: "find something unyielding and see what moves it", "silent interference", "the model reads the odometer".
 - When unsure whether something is a candidate, leave it out. Asking him about noise every morning will kill the habit.
