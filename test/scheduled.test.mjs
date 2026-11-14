@@ -561,3 +561,50 @@ test('phone-requests: a run still working when the timer fires again is left alo
   assert.equal(sb.claudeCalls().length, 0);
   assert.ok(!sb.calls().some((c) => c.startsWith('requests')), 'not even listed');
 });
+
+// --- What's emerging digest (2026-11-14) --------------------------------------------------------
+
+test('emerging-digest: last 3 days tagged (Opus), counted by the script, read written (Opus), entry sent to the note writer; FAIL paths named', () => {
+  const sb = base();
+  const day = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toLocaleDateString('en-CA'); };
+  sb.write(`scrub/bundle-${day(0)}.json`, JSON.stringify([{ source: 'Phone Notes', where: 'n1', written: day(0), text: 'a 944 provenance idea' }]));
+  sb.write(`scrub/bundle-${day(1)}.json`, JSON.stringify([{ source: 'Claude Code', where: 's1', written: day(1), text: 'job search outreach' }]));
+  sb.write(`scrub/bundle-${day(5)}.json`, JSON.stringify([{ source: 'Notion', where: 'old', written: day(5), text: 'outside the window' }]));
+  sb.write('bin/note.mjs', 'import fs from "node:fs"; if (process.env.FAKE_NOTE_FAIL) process.exit(1); fs.writeFileSync(process.env.NOTE_LOG, process.argv[2] + "\\n" + fs.readFileSync(0, "utf8"));');
+  sb.write('bin/ds.mjs', 'console.log(process.argv[2] === "focus" ? "FOCUS: 1) Job search" : "abc  next  [Job search]  Send outreach");');
+  sb.write('claude-behavior.sh', `case "$2" in
+  *"You tag"*) [ -z "$NO_TAGS" ] && echo '{"items":[{"i":0,"topics":["Car-related businesses"]},{"i":1,"topics":["Job search"]}],"concepts":[{"name":"Provenance","terms":["provenance"]}]}' > tags.json;;
+  *"You write"*) printf '**Last 3 days:** 2 threads\\n' > entry.md;;
+esac`);
+  const s = sb.copyScript('triggers/emerging-digest.sh', 'bin/emerging-digest.sh');
+  const env = { SCRUB_WORK: sb.path('scrub'), EMERGING_STATE: sb.path('state'), HARNESS_DIR: process.cwd(),
+    EMERGING_NOTE: sb.path('bin/note.mjs'), NOTE_LOG: sb.path('note.txt'), DS_CLI: sb.path('bin/ds.mjs') };
+  sb.run('bash', [s], { env });
+  assert.match(log(sb, 'emerging-digest'), /window: \{"items": 2.*\n.*stats: \{"threads": 2, "topics": 2, "concepts": 1, "untagged": 0\}\n.*OK: /);
+  const [tag, read] = sb.prompts();
+  assert.match(tag, /Personal \(not shown\).*Day job \(not shown\)/s);
+  assert.match(tag, /first run/);
+  assert.match(read, /FOCUS: 1\) Job search/);
+  assert.match(read, /abc  next/);
+  assert.match(read, /never compute or invent another/);
+  assert.equal(sb.claudeCalls().filter((c) => c.includes('[--model] [opus]')).length, 2);
+  assert.match(sb.read('note.txt'), /^\w{3} \d+\/\d+ — last 3 days\n\*\*Last 3 days:\*\* 2 threads/);
+  assert.deepEqual(JSON.parse(sb.read('state/history.json'))[0].topics, { 'Car-related businesses': 1, 'Job search': 1 });
+  // the next run reuses the names it recorded
+  sb.run('bash', [s], { env });
+  assert.match(sb.prompts()[2], /Reuse these names .*: Car-related businesses, Job search\./);
+  // failures are logged and nothing is recorded
+  let r = sb.run('bash', [s], { env: { ...env, NO_TAGS: '1' } });
+  assert.equal(r.code, 1);
+  assert.match(log(sb, 'emerging-digest'), /FAIL: tagging pass wrote no .*tags\.json\n$/);
+  r = sb.run('bash', [s], { env: { ...env, FAKE_NOTE_FAIL: '1' } });
+  assert.equal(r.code, 1);
+  assert.match(log(sb, 'emerging-digest'), /FAIL: note write/);
+  assert.equal(JSON.parse(sb.read('state/history.json')).length, 2);
+  // nothing written in the window: no model call, no entry
+  const quiet = base();
+  quiet.copyScript('triggers/emerging-digest.sh', 'bin/e.sh');
+  quiet.run('bash', [quiet.path('bin/e.sh')], { env: { ...env, SCRUB_WORK: quiet.path('none'), EMERGING_STATE: quiet.path('state') } });
+  assert.match(log(quiet, 'emerging-digest'), /OK: nothing written in the last 3 days, no entry\n$/);
+  assert.equal(quiet.claudeCalls().length, 0);
+});

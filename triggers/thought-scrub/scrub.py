@@ -38,6 +38,26 @@ SKIP_NOTION_DATABASES = {
     "3438b1a8-eec5-8102-81cd-c02d7f927334",  # Backlog - Archive
 }
 MIN_CHARS = 40  # shorter additions are edits, not thoughts
+# Phone Notes Claude writes itself (phone-notes src/requests.js CLAUDE_NOTES): never Daniel's thinking.
+CLAUDE_PHONE_NOTES = {"tactical", "pm-updates", "whats-emerging"}
+
+
+def phone_note_skipped(raw, meta):
+    """Claude's own notes, deleted notes, and personal or private ones (the pull never writes those, checked again here)."""
+    if meta.get("source_id") in CLAUDE_PHONE_NOTES or meta.get("phone_deleted", "").lower() == "true":
+        return True
+    m = re.match(r"^---\n(.*?)\n---", raw, re.S)
+    block, lists, key = (m.group(1) if m else ""), {}, None
+    for line in block.splitlines():
+        km = re.match(r"^([A-Za-z_]+):\s*(.*)$", line)
+        if km:
+            key = km.group(1)
+            lists[key] = [v.strip().strip("'\"") for v in km.group(2).strip("[]").split(",") if v.strip()]
+        elif key and re.match(r"^\s*-\s*", line):
+            lists[key].append(re.sub(r"^\s*-\s*", "", line).strip().strip("'\""))
+    folders = {v.lower() for v in lists.get("phone_folders", [])}
+    tags = {v.lower().lstrip("#") for v in lists.get("phone_tags", [])}
+    return "personal" in folders or bool(tags & {"personal", "private"})
 
 
 def frontmatter(text):
@@ -82,12 +102,18 @@ def vault_docs():
                 continue
             if meta.get("jpmc") == "work-example":
                 continue  # job-search material only, never content
+            if source == "Phone Notes":
+                if phone_note_skipped(raw, meta):
+                    continue
+                # Lines Claude adds under a finished @Claude request are not his.
+                body = "\n".join(l for l in body.splitlines() if not l.lstrip().startswith("── Claude"))
             if source == "Claude.ai":
                 body = daniel_turns_claude_ai(body)
-            written = (meta.get("updated") or meta.get("created") or "")[:10]
+            written = (meta.get("updated") or meta.get("phone_updated") or meta.get("created") or "")[:10]
             yield path, source, os.path.basename(path)[:-3], written, body
 
     yield from notes("Sources/Notion/*.md", "Notion")
+    yield from notes("Sources/Phone-Notes/*.md", "Phone Notes")  # live since 2026-10-09; missed until 2026-11-14
     yield from notes("Sources/Apple-Notes/*.md", "iPhone")  # archive, retired 2026-10
     yield from notes("Sources/Claude-Conversations/*.md", "Claude.ai")
     # Obsidian: only notes Daniel writes directly (vault root). Inbox is

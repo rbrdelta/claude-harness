@@ -1,0 +1,6 @@
+[Unit]
+Description=What's emerging digest (claude -p) into Phone Notes
+
+[Service]
+Type=oneshot
+ExecStart=/home/rbr01/.claude/hooks/emerging-digest.sh

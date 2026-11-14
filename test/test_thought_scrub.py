@@ -60,6 +60,12 @@ class Collect(unittest.TestCase):
         write(f"{v}/Sources/Claude-Conversations/work.md", f"---\njpmc: work-example\n---\n**You**\n{long}")
         write(f"{v}/Sources/Claude-Conversations/chat.md", f"**You**\n{long}\n**Claude**\nClaude said a long thing that must never be collected here.")
         write(f"{v}/Sources/Apple-Notes/short.md", "tiny")
+        pn = "---\nsource: phone-notes\nsource_id: {id}\nphone_folders:{folders}\nphone_tags: [{tags}]\nphone_updated: '2026-11-13T10:00:00Z'\n---\n{body}"
+        write(f"{v}/Sources/Phone-Notes/idea (n1).md", pn.format(id="n1", folders="\n  - Ideas", tags="", body=long + "\n── Claude, done 11/13: shipped it, a long line Claude wrote."))
+        write(f"{v}/Sources/Phone-Notes/diary (n2).md", pn.format(id="n2", folders="\n  - Personal", tags="", body=long))
+        write(f"{v}/Sources/Phone-Notes/tagged (n3).md", pn.format(id="n3", folders=" []", tags="private", body=long))
+        write(f"{v}/Sources/Phone-Notes/PM updates (pm-upd).md", pn.format(id="pm-updates", folders=" []", tags="", body=long))
+        write(f"{v}/Sources/Phone-Notes/Tactical (tactic).md", pn.format(id="tactical", folders=" []", tags="", body=long))
         write(f"{v}/root note.md", long)
         write(f"{v}/Inbox/claude-written.md", long)
         p = scrub.CODE_PROJECTS
@@ -90,8 +96,11 @@ class Collect(unittest.TestCase):
         self.assertEqual(where, [
             ("Claude Code", "Claude Code session abcdefgh (proj)"),
             ("Claude Code", "Claude Code session q ()"),
-            ("Claude.ai", "chat"), ("Notion", "idea"), ("Obsidian", "root note")])
-        self.assertEqual(summary["new_items"], 5)
+            ("Claude.ai", "chat"), ("Notion", "idea"), ("Obsidian", "root note"), ("Phone Notes", "idea (n1)")])
+        self.assertEqual(summary["new_items"], 6)
+        phone = next(x for x in b if x["source"] == "Phone Notes")
+        self.assertNotIn("Claude", phone["text"], "Claude's done line under a request is not his")
+        self.assertEqual(phone["written"], "2026-11-13")
         chat = next(x for x in b if x["where"] == "chat")
         self.assertNotIn("Claude said", chat["text"])
         self.assertEqual(next(x for x in b if x["where"] == "idea")["written"], "2026-10-20")
@@ -101,7 +110,7 @@ class Collect(unittest.TestCase):
     def test_nothing_is_seen_until_commit_then_only_additions_return(self):
         self.bundle()
         _, again = self.bundle()
-        self.assertEqual(len(again), 5, "collect alone never marks anything seen")
+        self.assertEqual(len(again), 6, "collect alone never marks anything seen")
         scrub.commit()
         self.assertFalse(os.path.exists(scrub.PENDING))
         summary, b = self.bundle()

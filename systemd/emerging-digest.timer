@@ -1,0 +1,10 @@
+[Unit]
+Description=What's emerging digest — Mon/Wed/Fri 08:00, after the thought scrub, with catch-up
+
+[Timer]
+OnCalendar=Mon,Wed,Fri 08:00
+Persistent=true
+Unit=emerging-digest.service
+
+[Install]
+WantedBy=timers.target
