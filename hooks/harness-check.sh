@@ -69,7 +69,7 @@ w=$(check_agent_job "JOB NEWS" "$HOME/.claude/hooks/job-news.log" 38)
 # Hiring posts (2026-11-12): daily since 11-13, so 2 days without an OK means it stopped
 w=$(check_agent_job "HIRING POSTS" "$HOME/.claude/hooks/job-posts.log" 2)
 [ -n "$w" ] && warnings="$warnings$w. "
-# Outreach follow-ups (2026-11-09): daily, so 2 days without an OK means reminders stopped reaching the phone
+# Outreach follow-ups (2026-11-09): daily, so 2 days without an OK means due follow-ups stopped reaching the backlog
 w=$(check_agent_job "OUTREACH FOLLOW-UPS" "$HOME/.claude/hooks/outreach-due.log" 2)
 [ -n "$w" ] && warnings="$warnings$w. "
 # Community and events list (2026-11-08): weekly on Sunday, so 9 days without an OK means it stopped

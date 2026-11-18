@@ -378,21 +378,61 @@ test('job-scan: runs job_scan.py in the job-search folder, logs its last line as
   assert.match(log(sb, 'job-scan'), /FAIL: .*job_scan\.py missing/);
 });
 
-test('outreach-due: pushes each due follow-up to Tactical and records its key (outreach_view.py skips recorded keys), FAIL when a Tactical write fails, no model call', () => {
+// A stand-in ds.mjs over a JSON file of work items: backlog --json, task-add, task-set detail=.
+const OUTREACH_FAKE_DS = `import fs from 'node:fs';
+const db = process.env.FAKE_DS_DB; const items = JSON.parse(fs.readFileSync(db, 'utf8'));
+const [cmd, ...a] = process.argv.slice(2);
+if (process.env.FAKE_DS_FAIL && cmd !== 'backlog') { console.error('no route to the database'); process.exit(1); }
+const flag = (n) => { const i = a.indexOf(n); return i >= 0 ? a[i + 1] : undefined; };
+if (cmd === 'backlog') console.log(JSON.stringify(items));
+else if (cmd === 'task-add') { items.push({ id: 'new' + items.length, text: a[0], project: flag('--project'), step: flag('--step'), tier: flag('--tier'), source: flag('--source'), next: flag('--next'), detail: flag('--detail'), status: 'open' }); console.log('added new'); }
+else if (cmd === 'task-set') { const t = items.find((x) => x.id === a[0]); t.detail = a[1].slice('detail='.length); console.log('set'); }
+fs.writeFileSync(db, JSON.stringify(items));`;
+
+test('outreach-due: due follow-ups go on the day\'s outreach work item (added to it, or created in Next), never the Tactical checklist; keys recorded once; FAIL when the backlog write fails; no model call', () => {
   const sb = base();
   const dir = sb.path('jobsearch');
-  sb.write('jobsearch/outreach_view.py', 'import sys\nprint("Ramp|next\\tRamp: message Yeno Konya (Sam quiet 5 days)")\nprint("Hex|next\\tHex: message Olivia Koshy (Carlos quiet 4 days)")');
-  sb.write('bin/tactical.mjs', 'import fs from "node:fs"; if (process.env.FAKE_TACTICAL_FAIL) process.exit(1); fs.appendFileSync(process.env.TACTICAL_LOG, process.argv.slice(2).join(" ") + "\\n");');
+  sb.write('jobsearch/outreach_view.py', 'import sys\nprint("Pat Lee|next\\tAcme: message Pat Lee (Lou quiet 5 days)")\nprint("Robin Diaz|next\\tGlobex: message Robin Diaz (Kim quiet 4 days)")');
+  sb.write('ds.mjs', OUTREACH_FAKE_DS);
   const s = sb.copyScript('triggers/outreach-due.sh', 'bin/outreach-due.sh');
-  const env = { JOB_SEARCH_DIR: dir, TACTICAL_ADD: sb.path('bin/tactical.mjs'), TACTICAL_LOG: sb.path('tactical.txt'), OUTREACH_STATE: sb.path('state.txt') };
+  const tool = sb.copyScript('tools/outreach-to-backlog.mjs', 'bin/outreach-to-backlog.mjs');
+  assert.doesNotMatch(readFileSync(new URL('../triggers/outreach-due.sh', import.meta.url), 'utf8') + readFileSync(new URL('../tools/outreach-to-backlog.mjs', import.meta.url), 'utf8'), /tactical-add|TACTICAL_ADD/);
+  const env = { JOB_SEARCH_DIR: dir, OUTREACH_TO_BACKLOG: tool, OUTREACH_DS: sb.path('ds.mjs'), FAKE_DS_DB: sb.path('db.json'), OUTREACH_STATE: sb.path('state.txt'), OUTREACH_TODAY: '2026-11-18' };
+  const items = () => JSON.parse(sb.read('db.json'));
+
+  // No item for the day: one is created in Next on the follow-up step, with both follow-ups in its detail.
+  sb.write('db.json', JSON.stringify([{ id: 'old', text: '11/17 job search outreach', step: 'job-search/follow-up', status: 'open', detail: 'yesterday' }, { id: 'closed', text: '11/18 job search outreach', step: 'job-search/follow-up', status: 'done', detail: '' }]));
   sb.run('bash', [s], { env });
   assert.match(log(sb, 'outreach-due'), /START\n.*OK: due=2 pushed=2\n$/);
-  assert.match(sb.read('tactical.txt'), /Follow up, Ramp: message Yeno Konya .* --from Outreach cadence\n/);
-  assert.equal(sb.read('state.txt'), 'Ramp|next\nHex|next\n');
+  assert.equal(sb.read('state.txt'), 'Pat Lee|next\nRobin Diaz|next\n');
+  let made = items().find((t) => t.id.startsWith('new'));
+  assert.equal(made.text, '11/18 job search outreach');
+  assert.deepEqual([made.project, made.step, made.tier, made.source], ['Job search', 'job-search/follow-up', 'next', 'Outreach cadence']);
+  assert.match(made.detail, /^Done when each follow-up below is sent/);
+  assert.match(made.detail, /- Acme: message Pat Lee \(Lou quiet 5 days\)\n- Globex: message Robin Diaz/);
+  assert.equal(items().find((t) => t.id === 'old').detail, 'yesterday');
+  assert.equal(items().length, 3);
   assert.equal(sb.claudeCalls().length, 0);
-  const r = sb.run('bash', [s], { env: { ...env, FAKE_TACTICAL_FAIL: '1' } });
+
+  // The day's item already exists and names one person: only the other is added; what was there is kept; no second item.
+  sb.write('db.json', JSON.stringify([{ id: 'day', text: '11/18 job search outreach', step: 'job-search/follow-up', status: 'open', detail: 'Done when all are sent.\nReminders: Robin Diaz (Globex).' }]));
+  sb.run('bash', [s], { env });
+  assert.equal(items().length, 1);
+  assert.equal(items()[0].detail, 'Done when all are sent.\nReminders: Robin Diaz (Globex).\nFollow-ups due 11/18, added by the morning follow-up job:\n- Acme: message Pat Lee (Lou quiet 5 days)');
+
+  // A failed backlog write: FAIL in the log, exit 1, no key recorded (so the next run tries again).
+  sb.write('state.txt', '');
+  sb.write('db.json', '[]');
+  const r = sb.run('bash', [s], { env: { ...env, FAKE_DS_FAIL: '1' } });
   assert.equal(r.code, 1);
-  assert.match(log(sb, 'outreach-due'), /FAIL: due=2 pushed=0 failed=2/);
+  assert.match(log(sb, 'outreach-due'), /FAIL: due=2 pushed=0 \(backlog write: /);
+  assert.equal(sb.read('state.txt'), '');
+
+  // Nothing due: OK, nothing written.
+  sb.write('jobsearch/outreach_view.py', 'pass');
+  sb.run('bash', [s], { env });
+  assert.match(log(sb, 'outreach-due'), /OK: due=0 pushed=0\n$/);
+  assert.equal(sb.read('db.json'), '[]');
   sb.run('bash', [s], { env: { ...env, JOB_SEARCH_DIR: sb.path('nowhere') } });
   assert.match(log(sb, 'outreach-due'), /FAIL: .*outreach_view\.py missing/);
 });

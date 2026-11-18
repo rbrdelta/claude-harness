@@ -1,5 +1,5 @@
 [Unit]
-Description=Outreach follow-ups due (job search cadence to the Tactical checklist)
+Description=Outreach follow-ups due (job search cadence to the day's backlog item)
 
 [Service]
 Type=oneshot
