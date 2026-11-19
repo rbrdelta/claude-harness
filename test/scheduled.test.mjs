@@ -80,6 +80,9 @@ test('pm-run overnight: Opus, full /pm prompt that reads the vault sources and s
   assert.match(p, /WEEKLY OUTCOMES AND THE ONE THING/);
   assert.match(p, /\$DS one-set <id> --by pm/);
   assert.match(p, /never replaced: it stays until done/);
+  assert.match(p, /DAILY-HABIT OUTCOMES[\s\S]*standing floor, not a candidate for the one thing/, 'a daily-habit outcome does not take the one thing (trial, 2026-11-19)');
+  assert.match(p, /highest-ranked unmet outcome whose finish line can be crossed this week/);
+  assert.match(p, /If a daily-habit outcome is the only unmet one left, its day item is the one thing/);
   assert.match(p, /A remark about when he will do something \('we'll resume prep tomorrow'\) is not an override/, 'a scheduling remark does not take the one thing (2026-11-10)');
   assert.match(p, /should this replace the one thing\?/);
   assert.match(p, /never write or change them yourself/);
