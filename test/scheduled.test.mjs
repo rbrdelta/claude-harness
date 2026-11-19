@@ -80,6 +80,7 @@ test('pm-run overnight: Opus, full /pm prompt that reads the vault sources and s
   assert.match(p, /WEEKLY OUTCOMES AND THE ONE THING/);
   assert.match(p, /\$DS one-set <id> --by pm/);
   assert.match(p, /never replaced: it stays until done/);
+  assert.match(p, /ASKS ARE NOT WORK ITEMS[\s\S]*ask-add[\s\S]*--kind quick\|input[\s\S]*'Waits on: <the ask>'/, 'a question for Daniel goes on the ask list, never the backlog (2026-11-19)');
   assert.match(p, /DAILY-HABIT OUTCOMES[\s\S]*standing floor, not a candidate for the one thing/, 'a daily-habit outcome does not take the one thing (trial, 2026-11-19)');
   assert.match(p, /highest-ranked unmet outcome whose finish line can be crossed this week/);
   assert.match(p, /If a daily-habit outcome is the only unmet one left, its day item is the one thing/);

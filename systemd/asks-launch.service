@@ -1,0 +1,6 @@
+[Unit]
+Description=Ask session launcher — at most one session a day to burn down what Claude needs from Daniel
+
+[Service]
+Type=oneshot
+ExecStart=/home/rbr01/.claude/hooks/asks-launch.sh

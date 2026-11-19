@@ -1,0 +1,10 @@
+[Unit]
+Description=Ask session launcher — 07:30, with retries at 08:30 and 09:30
+
+[Timer]
+OnCalendar=*-*-* 07,08,09:30:00
+Persistent=true
+Unit=asks-launch.service
+
+[Install]
+WantedBy=timers.target
