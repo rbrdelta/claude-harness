@@ -8,6 +8,8 @@
 // Telegram says when a session is ready (with its link) or when a launch failed. Retro only, by design.
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync, appendFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import { transcriptPath, linkFromTranscript, LINK_ON_SCREEN } from './rc-link.mjs';
 
 const HOME = process.env.HOME;
 const DS = process.env.RETRO_DS || `${HOME}/projects/active/daily-standard/scripts/ds.mjs`;
@@ -70,12 +72,14 @@ for (const s of slotted.filter((x) => RETRO_ID.test(x.taskId))) {
   if (alive(sess)) { state.launched[s.taskId] = { slot, tmux: sess, at: new Date().toISOString(), adopted: true }; save(); log(`adopted running ${sess}`); continue; }
   const prompt = `/retro This session was opened automatically because Daniel put the weekly retro (work item ${s.taskId}) into his Daily Standard for ${slot}. Get ready now: find and read the latest prep doc, then open with the first part of the walk-through and stop there. Daniel joins when the slot comes; wait for him.`;
   let url = null;
+  const sid = randomUUID();
+  const transcript = transcriptPath(HOME, HOME, sid);
   try {
-    tmux('new-session', '-d', '-s', sess, '-c', HOME, `${CLAUDE} --remote-control ${sq(name)} ${sq(prompt)}`);
+    tmux('new-session', '-d', '-s', sess, '-c', HOME, `${CLAUDE} --session-id ${sid} --remote-control ${sq(name)} ${sq(prompt)}`);
     for (let t = 0; t < WAIT_S && !url; t += 5) {
       sleep(5);
       if (!alive(sess)) break;
-      url = (tmux('capture-pane', '-p', '-J', '-S', '-200', '-t', `=${sess}:`).match(/https:\/\/claude\.ai\/code\/session_\w+/) || [])[0] || null;
+      url = linkFromTranscript(transcript) || (tmux('capture-pane', '-p', '-J', '-S', '-200', '-t', `=${sess}:`).match(LINK_ON_SCREEN) || [])[0] || null;
     }
   } catch (e) { log(`tmux error: ${e.message.split('\n')[0]}`); }
   if (url) {

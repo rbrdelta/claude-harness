@@ -9,6 +9,8 @@
 //                     Daniel the link on Telegram. Yesterday's unopened ask session is closed first, so one waits.
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync, appendFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import { transcriptPath, linkFromTranscript, LINK_ON_SCREEN } from './rc-link.mjs';
 
 const HOME = process.env.HOME;
 const DS = process.env.ASKS_DS || `${HOME}/projects/active/daily-standard/scripts/ds.mjs`;
@@ -68,12 +70,14 @@ const prompt = [
 ].join(' ');
 
 let url = null;
+const sid = randomUUID();
+const transcript = transcriptPath(HOME, HOME, sid);
 try {
-  if (!alive(sess)) tmux('new-session', '-d', '-s', sess, '-c', HOME, `${CLAUDE} --remote-control ${sq(name)} ${sq(prompt)}`);
+  if (!alive(sess)) tmux('new-session', '-d', '-s', sess, '-c', HOME, `${CLAUDE} --session-id ${sid} --remote-control ${sq(name)} ${sq(prompt)}`);
   for (let t = 0; t < WAIT_S && !url; t += 5) {
     sleep(5);
     if (!alive(sess)) break;
-    url = (tmux('capture-pane', '-p', '-J', '-S', '-200', '-t', `=${sess}:`).match(/https:\/\/claude\.ai\/code\/session_\w+/) || [])[0] || null;
+    url = linkFromTranscript(transcript) || (tmux('capture-pane', '-p', '-J', '-S', '-200', '-t', `=${sess}:`).match(LINK_ON_SCREEN) || [])[0] || null;
   }
 } catch (e) { log(`tmux error: ${e.message.split('\n')[0]}`); }
 

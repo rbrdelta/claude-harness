@@ -31,7 +31,7 @@ test('retro-launch: a slotted retro starts one named Remote Control session that
   const sb = setup([slot('retro-2026-10-26')]);
   assert.equal(sb.launch().code, 0);
   const cmd = sb.read('tmux/retro-2026-10-26');
-  assert.match(cmd, /^\/opt\/claude --remote-control 'Retro: Wed, Oct 28, evening \(slotted by Daniel\)' '\/retro This session was opened automatically/);
+  assert.match(cmd, /^\/opt\/claude --session-id [0-9a-f-]{36} --remote-control 'Retro: Wed, Oct 28, evening \(slotted by Daniel\)' '\/retro This session was opened automatically/);
   assert.match(cmd, /work item retro-2026-10-26.*stop there\. Daniel joins when the slot comes; wait for him\.'$/);
   assert.ok(sb.calls().some((c) => c.startsWith('tmux [new-session] [-d] [-s] [retro-2026-10-26] [-c]')));
   assert.equal(sb.state().launched['retro-2026-10-26'].url, URL1);
