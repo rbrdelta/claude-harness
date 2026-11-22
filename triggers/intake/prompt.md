@@ -27,7 +27,9 @@ One item can take two routes (round 1 #1: a build idea and a research thread). O
 
 ## Before you route anything
 
-- Already on file? Check the context: an open or recent work item, an open ask, an outcome from the last 14 days. If it is there, the outcome is G or H with `exists` naming it, never a new item. Round 1 #5 and #27 were misses for exactly this.
+- Already on file? Check the context: an open or recent work item, an open ask, an outcome from the last 14 days. If it is there, the outcome is G or H with `exists` naming it (its id from the context file), never a new item. Round 1 #5 and #27 were misses for exactly this.
+- Graded is not filed. The gold set in the design note is Daniel grading where pieces belong; it put nothing anywhere. A piece he graded there still takes the route he gave it, unless the context file shows it actually placed. Never cite the gold set or "round 1" as the reason something is on file: that turns a real item into a silent drop, the failure he cares about most.
+- Handled in the moment means the session did the thing or answered it. A rule he states in a session (C), a view he voices (E) or a story he tells (F) is not handled just because the session replied; it still needs a place.
 - Claude's words are not his. Lines starting "── Claude", text Claude wrote that he pasted back, a quoted speaker: not his. Notes on someone else's talk count only for his own reaction.
 - Day-job material (JPMC: his current team, internal projects, CRM, RBAC at work) is never a build idea or a to-do here: route H with flag "day-job", unless it is job-search material (interview stories go to F, project "job search").
 - Personal (family, health, money, relationships): route H with flag "personal" and no quote.
