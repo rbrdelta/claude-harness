@@ -66,7 +66,10 @@ const prompt = [
   `Daniel, 2026-11-19: "you can start one session max per day with a list that we need to burn down. These are quick decisions ... and decisions that require me to actually sit down and provide input."`,
   `Get ready now, then stop and wait for him. 1) Run node ${DS} asks. 2) For each ask, first search what he already said (his CLAUDE.md rule 19: the project's files, the vault, earlier sessions); if the answer is on file, run ds ask-drop <id> "on file: <where>" and do not ask it.`,
   `3) Open with the list, quick ones first: one line each, "I need <answer> to unlock <work>", with your recommendation so a quick one takes a yes or no. Then the ones that need his input: what you need from him and about how long it takes. Plain words, no ids in what he reads.`,
-  `When he answers, record it in his words: node ${DS} ask-close <id> "<his answer>" --daily. Then do what it unlocks now if it is quick, or set the unlocked work item's next step. Anything he defers stays open for tomorrow's list. Before he leaves, run node ${DS} ask-stats and tell him the two numbers in one line each.`,
+  `When he answers, record it in his words: node ${DS} ask-close <id> "<his answer>" --daily, and set the unlocked work item's next step. Anything he defers stays open for tomorrow's list.`,
+  `His time is the measure (2026-11-21: one ask session took about 2 to 3 hours of his time, most of it reading Claude's long replies and nine rounds on one email). Aim for 15 minutes of his time. Keep every reply short: answer what he asked, nothing else. When the list is done, or at about 15 minutes, say so and close.`,
+  `Do the unlocked work after he is done, not with him in the session. Work that goes out under his name or needs his review (an email, an application answer, a page) comes back to him once, finished: first read /mnt/c/MCP/Meta/Voice — writing samples.md including "From his edits", pick the strongest example from the record yourself (never ask him for one), check every fact, and reread every sentence in his style. He gets one review round. If it misses, record his correction in "From his edits", redo it on your own, and put it on tomorrow's list instead of another round today.`,
+  `Before he leaves, run node ${DS} ask-stats and tell him the two numbers in one line each.`,
 ].join(' ');
 
 let url = null;
