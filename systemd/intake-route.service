@@ -1,0 +1,6 @@
+[Unit]
+Description=Intake pipeline (claude -p router, preview mode) over the thought scrub's daily bundle
+
+[Service]
+Type=oneshot
+ExecStart=/home/rbr01/.claude/hooks/intake-route.sh

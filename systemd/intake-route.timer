@@ -1,0 +1,10 @@
+[Unit]
+Description=Intake pipeline — daily 07:25, after the 07:00 thought scrub writes the day's bundle, with catch-up
+
+[Timer]
+OnCalendar=*-*-* 07:25
+Persistent=true
+Unit=intake-route.service
+
+[Install]
+WantedBy=timers.target

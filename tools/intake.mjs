@@ -1,0 +1,187 @@
+#!/usr/bin/env node
+// Intake pipeline (2026-11-21): everything Daniel captured goes through one router and every piece gets a recorded
+// outcome. Design, his decisions and the gold sets: vault Inbox/Intake pipeline — design and gold set.md.
+//
+// The router (an Opus pass, triggers/intake/prompt.md) only proposes routes. This script does everything
+// deterministic around it:
+//   prepare <bundle.json> <dir>       items.json (ids, secrets redacted) + context.json (work items, asks, recent outcomes)
+//   check <dir>                       validate routes.json against items.json -> checked.json; nothing is ever dropped:
+//                                     an item the router skipped or a quote that is not his exact words is flagged
+//   record <dir> [--mode preview]     append to ~/.claude/intake/outcomes.jsonl and rewrite the vault note
+//                                     Inbox/Intake — outcomes.md (what happened to each piece, last 14 days)
+//   sheet [--days 7] [--n 30]         a gold-set sheet to grade: every routed item, then a sample of the "no action" ones
+//
+// Preview mode (until Daniel signs off): outcomes are recorded and shown, nothing is written to the backlog or asks.
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+import { execFileSync } from 'child_process';
+
+const HOME = os.homedir();
+const STATE = process.env.INTAKE_STATE || `${HOME}/.claude/intake`;
+const VAULT = process.env.INTAKE_VAULT || '/mnt/c/MCP';
+const DS = process.env.INTAKE_DS || `${HOME}/projects/active/daily-standard/scripts/ds.mjs`;
+const OUTCOMES = path.join(STATE, 'outcomes.jsonl');
+const NOTE = path.join(VAULT, 'Inbox', 'Intake — outcomes.md');
+const ROUTES = { A: 'Build idea', B: 'To-do', C: 'Decision or rule', D: 'Open question', E: 'Idea or view', F: 'Project notes', G: 'Handled in the moment', H: 'Nothing to act on' };
+const DAY = 864e5;
+
+const readJSON = (f, d) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return d; } };
+const writeJSON = (f, v) => { fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, JSON.stringify(v, null, 1)); };
+const norm = (s) => String(s || '').replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, ' ').trim();
+
+// ---- secrets never leave intake ----
+const SECRET_PATTERNS = [
+  /sk-ant-[A-Za-z0-9_-]{20,}/g, /\bAQ\.[A-Za-z0-9_-]{20,}/g, /\bgh[pousr]_[A-Za-z0-9]{20,}/g, /\bxox[abpr]-[A-Za-z0-9-]{10,}/g,
+  /\bAIza[0-9A-Za-z_-]{30,}/g, /\b(?:api[_ -]?key|token|secret|password)\s*(?:is|:|=)\s*\S{12,}/gi,
+];
+export function redact(text) {
+  let out = String(text || ''), hit = false;
+  for (const re of SECRET_PATTERNS) out = out.replace(re, () => { hit = true; return '[secret removed]'; });
+  return { text: out, hit };
+}
+
+// ---- prepare ----
+export function prepareItems(bundle, date) {
+  return bundle.map((x, i) => {
+    const r = redact(x.text);
+    return { id: `${date}#${i + 1}`, source: x.source, where: x.where, written: x.written, text: r.text, ...(r.hit ? { secret_removed: true } : {}) };
+  });
+}
+
+function ds(args) {
+  try { return JSON.parse(execFileSync('node', [DS, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 60000 })); } catch { return null; }
+}
+
+export function recentOutcomes(now = Date.now(), days = 14) {
+  if (!fs.existsSync(OUTCOMES)) return [];
+  return fs.readFileSync(OUTCOMES, 'utf8').split('\n').filter(Boolean).map(l => { try { return JSON.parse(l); } catch { return null; } })
+    .filter(o => o && now - Date.parse(o.recorded_at) < days * DAY);
+}
+
+function buildContext(now = Date.now()) {
+  const backlog = ds(['backlog', '--json']);
+  const items = (Array.isArray(backlog) ? backlog : backlog?.tasks || backlog?.items || [])
+    .filter(t => t.status !== 'dropped')
+    .map(t => ({ id: t.id, status: t.status, project: t.project, owner: t.owner, title: t.text, next: t.next || '' }));
+  const asks = (ds(['asks', '--json']) || []).map(a => ({ id: a.id, text: a.text, status: a.status }));
+  const outcomes = recentOutcomes(now).filter(o => !o.routes.every(r => r === 'G'))
+    .map(o => ({ date: o.recorded_at.slice(0, 10), where: o.where, routes: o.routes, title: o.title, exists: o.exists || '' }));
+  return { work_items: items, open_asks: asks, recent_outcomes: outcomes };
+}
+
+// ---- check ----
+export function checkRoutes(items, routes) {
+  const byId = new Map(items.map(i => [i.id, i]));
+  const out = [], problems = [];
+  for (const r of Array.isArray(routes) ? routes : []) {
+    const item = byId.get(r.id);
+    if (!item) { problems.push(`unknown id ${r.id}`); continue; }
+    let rs = (Array.isArray(r.routes) ? r.routes : [r.routes]).map(x => String(x || '').trim().toUpperCase()).filter(x => ROUTES[x]);
+    const flags = [...new Set(r.flags || [])];
+    if (!rs.length) { rs = ['H']; flags.push('router gave no valid route'); problems.push(`${r.id}: no valid route`); }
+    let quote = redact(r.quote || '').text;
+    if (flags.includes('personal') || flags.includes('secret')) quote = '';
+    if (quote && !norm(item.text).includes(norm(quote).replace(/\s*(\.\.\.|…)\s*$/, ''))) {
+      flags.push('quote not his exact words'); problems.push(`${r.id}: quote not verbatim`);
+      quote = '';
+    }
+    if (item.secret_removed && !flags.includes('secret')) flags.push('secret');
+    out.push({ id: r.id, source: item.source, where: item.where, written: item.written, routes: rs.slice(0, 2),
+      ...(r.kind ? { kind: r.kind } : {}), ...(r.bundle ? { bundle: r.bundle } : {}),
+      title: redact(r.title || '').text.slice(0, 120), quote: quote.slice(0, 400), where_to: r.where_to || '', owner: r.owner || '',
+      exists: r.exists || '', reason: redact(r.reason || '').text, flags });
+  }
+  const seen = new Set(out.map(o => o.id));
+  for (const it of items) {
+    if (seen.has(it.id)) continue;
+    // Never a silent drop: an item the router skipped is recorded as needing a look.
+    out.push({ id: it.id, source: it.source, where: it.where, written: it.written, routes: ['H'], title: `(no outcome from the router) ${it.where}`,
+      quote: '', where_to: '', owner: '', exists: '', reason: 'The router returned nothing for this item; it needs a look.', flags: ['missed by router'] });
+    problems.push(`${it.id}: missed by router`);
+  }
+  return { outcomes: out.sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true })), problems };
+}
+
+// ---- record ----
+export function renderOutcomesNote(all, now = Date.now()) {
+  const recent = all.filter(o => now - Date.parse(o.recorded_at) < 14 * DAY);
+  const byDate = new Map();
+  for (const o of recent) { const d = String(o.id).split('#')[0] || o.recorded_at.slice(0, 10); /* the bundle's day, not the run's */ if (!byDate.has(d)) byDate.set(d, []); byDate.get(d).push(o); }
+  const lines = ['---', `updated: "${new Date(now).toISOString()}"`, 'tags: [harness, intake-pipeline]', '---', '',
+    '# Intake — outcomes', '',
+    'What happened to each piece Daniel captured: one line per piece, last 14 days, newest first. Written by the intake pipeline (claude-harness `triggers/intake/run.sh`). While the mode says preview, nothing was written anywhere: these are proposals.', '',
+    'Routes: ' + Object.entries(ROUTES).map(([k, v]) => `${k} ${v}`).join(' · '), ''];
+  for (const d of [...byDate.keys()].sort().reverse()) {
+    const os_ = byDate.get(d);
+    const raised = os_.filter(o => !o.routes.every(r => r === 'G' || r === 'H'));
+    lines.push(`## ${d} (${os_[0].mode}): ${os_.length} pieces, ${raised.length} routed, ${os_.length - raised.length} no action`, '');
+    for (const o of [...raised, ...os_.filter(o => !raised.includes(o))]) {
+      const tag = o.routes.join('+');
+      const extra = [o.kind, o.bundle && `bundle: ${o.bundle}`, o.where_to && `to: ${o.where_to}`, o.owner === 'Claude' && 'Claude does it', o.exists && `on file: ${o.exists}`, o.flags?.length && `flags: ${o.flags.join(', ')}`].filter(Boolean).join('; ');
+      lines.push(`- **${tag}** ${o.title} (${o.source}, ${o.where})${extra ? ` [${extra}]` : ''}`);
+      if (o.quote) lines.push(`  > ${o.quote.replace(/\n+/g, ' ')}`);
+      lines.push(`  why: ${o.reason}`);
+    }
+    lines.push('');
+  }
+  return lines.join('\n');
+}
+
+function record(dir, mode) {
+  const checked = readJSON(path.join(dir, 'checked.json'), null);
+  if (!checked) throw new Error('no checked.json');
+  const at = new Date().toISOString();
+  fs.mkdirSync(STATE, { recursive: true });
+  fs.appendFileSync(OUTCOMES, checked.outcomes.map(o => JSON.stringify({ ...o, mode, recorded_at: at })).join('\n') + '\n');
+  const all = fs.readFileSync(OUTCOMES, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l));
+  fs.mkdirSync(path.dirname(NOTE), { recursive: true });
+  fs.writeFileSync(NOTE, renderOutcomesNote(all));
+  const n = (k) => checked.outcomes.filter(o => o.routes.includes(k)).length;
+  return `${checked.outcomes.length} pieces: ` + Object.keys(ROUTES).map(k => `${k} ${n(k)}`).join(', ') + `; ${checked.problems.length} problem(s)`;
+}
+
+// ---- gold-set sheet ----
+export function sampleSheet(all, n = 30, seed = 1) {
+  let s = seed; const rand = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+  const seen = new Set();
+  const uniq = all.filter(o => { const k = o.id + o.title; if (seen.has(k)) return false; seen.add(k); return true; });
+  const routed = uniq.filter(o => !o.routes.every(r => r === 'G' || r === 'H'));
+  const quiet = uniq.filter(o => o.routes.every(r => r === 'G' || r === 'H'));
+  const pick = (arr, k) => { const a = [...arr]; const out = []; while (a.length && out.length < k) out.push(a.splice(Math.floor(rand() * a.length), 1)[0]); return out; };
+  const nQuiet = Math.min(quiet.length, Math.max(10, n - routed.length));
+  const chosen = [...pick(routed, n - nQuiet), ...pick(quiet, nQuiet)];
+  return chosen.sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
+}
+
+function main() {
+  const [cmd, ...rest] = process.argv.slice(2);
+  const flag = (k, d) => { const i = rest.indexOf(k); return i >= 0 ? rest[i + 1] : d; };
+  if (cmd === 'prepare') {
+    const [bundleFile, dir] = rest;
+    const date = (path.basename(bundleFile).match(/\d{4}-\d\d-\d\d/) || [new Date().toISOString().slice(0, 10)])[0];
+    const items = prepareItems(readJSON(bundleFile, []), date);
+    writeJSON(path.join(dir, 'items.json'), items);
+    writeJSON(path.join(dir, 'context.json'), buildContext());
+    console.log(`${items.length} items`);
+  } else if (cmd === 'check') {
+    const [dir] = rest;
+    const items = readJSON(path.join(dir, 'items.json'), []);
+    const routes = readJSON(path.join(dir, 'routes.json'), null);
+    if (!Array.isArray(routes)) { console.error('routes.json missing or not a JSON array'); process.exit(1); }
+    const c = checkRoutes(items, routes);
+    writeJSON(path.join(dir, 'checked.json'), c);
+    console.log(`${c.outcomes.length} outcomes; problems: ${c.problems.length ? c.problems.join('; ') : 'none'}`);
+  } else if (cmd === 'record') {
+    console.log(record(rest[0], flag('--mode', 'preview')));
+  } else if (cmd === 'sheet') {
+    const days = Number(flag('--days', 7)), n = Number(flag('--n', 30));
+    const all = recentOutcomes(Date.now(), days);
+    console.log(JSON.stringify(sampleSheet(all, n), null, 1));
+  } else {
+    console.error('usage: intake.mjs prepare <bundle> <dir> | check <dir> | record <dir> [--mode preview] | sheet [--days 7] [--n 30]');
+    process.exit(2);
+  }
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) main();

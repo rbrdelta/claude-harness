@@ -65,6 +65,9 @@ w=$(check_agent_job "THOUGHT SCRUB" "$HOME/.claude/hooks/thought-scrub.log" 2)
 # Cloud sessions pull (2026-11-21): daily, so 2 days without an OK means replies in cloud runs stopped reaching the vault
 w=$(check_agent_job "CLOUD SESSIONS" "$HOME/.claude/hooks/cloud-sessions-pull.log" 2)
 [ -n "$w" ] && warnings="$warnings$w. "
+# Intake pipeline (2026-11-21): daily after the thought scrub; 2 days without an OK means captured pieces stopped getting outcomes
+w=$(check_agent_job "INTAKE" "$HOME/.claude/hooks/intake-route.log" 2)
+[ -n "$w" ] && warnings="$warnings$w. "
 w=$(check_agent_job "JOB SCAN" "$HOME/.claude/hooks/job-scan.log" 9)
 [ -n "$w" ] && warnings="$warnings$w. "
 w=$(check_agent_job "JOB NEWS" "$HOME/.claude/hooks/job-news.log" 38)
