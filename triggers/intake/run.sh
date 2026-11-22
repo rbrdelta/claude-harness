@@ -12,7 +12,7 @@
 LOG_FILE="$HOME/.claude/hooks/intake-route.log"
 DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 TOOL="$DIR/../../tools/intake.mjs"
-WORK="${INTAKE_WORK:-$HOME/.claude/intake/runs}"
+WORK="${INTAKE_WORK:-$HOME/.local/state/claude-intake/runs}"  # outside ~/.claude: Claude Code refuses model writes there
 SCRUB_WORK="${SCRUB_WORK:-$HOME/.claude/thought-scrub/work}"
 MODE="${INTAKE_MODE:-preview}"
 log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $1" >> "$LOG_FILE"; }
