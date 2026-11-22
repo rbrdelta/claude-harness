@@ -18,6 +18,8 @@ const NOTIFY = process.env.ASKS_NOTIFY || `${HOME}/projects/active/claude-harnes
 const LOG = process.env.ASKS_LOG || `${HOME}/.claude/hooks/asks-launch.log`;
 const STATE = process.env.ASKS_LAUNCH_STATE || `${HOME}/.claude/hooks/asks-launch-state.json`;
 const CLAUDE = process.env.ASKS_CLAUDE || 'claude';
+const TIME = `${HOME}/projects/active/claude-harness/tools/session-time.mjs`;
+const TIME_LOG = process.env.ASKS_TIME_LOG || `${HOME}/.claude/hooks/asks-session-time.jsonl`;
 const WAIT_S = Number(process.env.ASKS_WAIT_S ?? 90);
 const MAX_TRIES = 3;
 const TRANSIENT = /fetch failed|ETIMEDOUT|ENETUNREACH|EHOSTUNREACH|ECONNRESET|EAI_AGAIN|UND_ERR_CONNECT_TIMEOUT/;
@@ -61,6 +63,8 @@ const sess = `asks-${day}`;
 for (const s of sessions()) if (/^asks-\d{4}-\d{2}-\d{2}$/.test(s) && s !== sess) { try { tmux('kill-session', '-t', `=${s}`); log(`closed earlier ${s}`); } catch {} }
 
 const name = `Asks: ${pretty(day)} (${quick} quick, ${input} need your input)`;
+const sid = randomUUID();
+const transcript = transcriptPath(HOME, HOME, sid);
 const prompt = [
   `This session was opened automatically: ${asks.length} ask(s) are waiting on Daniel, things Claude needs from him to unlock work.`,
   `Daniel, 2026-11-19: "you can start one session max per day with a list that we need to burn down. These are quick decisions ... and decisions that require me to actually sit down and provide input."`,
@@ -69,12 +73,10 @@ const prompt = [
   `When he answers, record it in his words: node ${DS} ask-close <id> "<his answer>" --daily, and set the unlocked work item's next step. Anything he defers stays open for tomorrow's list.`,
   `His time is the measure (2026-11-21: one ask session took about 4.5 to 5 hours of his time, about 2.5 of them on nine rounds of one email; a 15-20 minute gap between messages is him reading, thinking and writing, not idle). Aim for 15 minutes of his time. Keep every reply short: answer what he asked, nothing else. When the list is done, or at about 15 minutes, say so and close.`,
   `Do the unlocked work after he is done, not with him in the session. Work that goes out under his name or needs his review (an email, an application answer, a page) comes back to him once, finished: first read /mnt/c/MCP/Meta/Voice — writing samples.md including "From his edits", pick the strongest example from the record yourself (never ask him for one), check every fact, and reread every sentence in his style. He gets one review round. If it misses, record his correction in "From his edits", redo it on your own, and put it on tomorrow's list instead of another round today.`,
-  `Before he leaves, run node ${DS} ask-stats and tell him the two numbers in one line each.`,
+  `Before he leaves, run node ${DS} ask-stats and tell him the two numbers in one line each, then run node ${TIME} ${transcript} --log ${TIME_LOG} and give him its line: his time in this session, estimated from the words read and written (Daniel: "estimate based on the proportion of input and response").`,
 ].join(' ');
 
 let url = null;
-const sid = randomUUID();
-const transcript = transcriptPath(HOME, HOME, sid);
 try {
   if (!alive(sess)) tmux('new-session', '-d', '-s', sess, '-c', HOME, `${CLAUDE} --session-id ${sid} --remote-control ${sq(name)} ${sq(prompt)}`);
   for (let t = 0; t < WAIT_S && !url; t += 5) {
