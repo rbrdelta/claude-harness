@@ -1,0 +1,10 @@
+[Unit]
+Description=Cloud sessions pull — daily 05:40, before the 06:00 PM run and the 07:00 thought scrub, with catch-up
+
+[Timer]
+OnCalendar=*-*-* 05:40
+Persistent=true
+Unit=cloud-sessions-pull.service
+
+[Install]
+WantedBy=timers.target

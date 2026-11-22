@@ -107,7 +107,7 @@ def vault_docs():
                     continue
                 # Lines Claude adds under a finished @Claude request are not his.
                 body = "\n".join(l for l in body.splitlines() if not l.lstrip().startswith("── Claude"))
-            if source == "Claude.ai":
+            if source in ("Claude.ai", "Cloud session"):
                 body = daniel_turns_claude_ai(body)
             written = (meta.get("updated") or meta.get("phone_updated") or meta.get("created") or "")[:10]
             yield path, source, os.path.basename(path)[:-3], written, body
@@ -116,6 +116,7 @@ def vault_docs():
     yield from notes("Sources/Phone-Notes/*.md", "Phone Notes")  # live since 2026-10-09; missed until 2026-11-14
     yield from notes("Sources/Apple-Notes/*.md", "iPhone")  # archive, retired 2026-10
     yield from notes("Sources/Claude-Conversations/*.md", "Claude.ai")
+    yield from notes("Sources/Cloud-Sessions/*.md", "Cloud session")  # runs of scheduled cloud tasks, 2026-11-21
     # Obsidian: only notes Daniel writes directly (vault root). Inbox is
     # mostly Claude-written and is deliberately excluded.
     yield from notes("*.md", "Obsidian")

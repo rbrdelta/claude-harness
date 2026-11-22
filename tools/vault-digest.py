@@ -13,7 +13,7 @@ and JPMC work examples (job-search material only, never planning input).
 import argparse, glob, os, re, time
 from datetime import datetime
 
-SOURCES = [("Claude-Conversations", "claude.ai conversation"), ("Phone-Notes", "phone note"), ("Notion", "Notion page")]
+SOURCES = [("Claude-Conversations", "claude.ai conversation"), ("Cloud-Sessions", "cloud session"), ("Phone-Notes", "phone note"), ("Notion", "Notion page")]
 SKIP_TAGS = {"personal", "private", "confidential"}
 PER_NOTE = 4000
 
@@ -90,7 +90,7 @@ def main():
                 continue
             found.append((t, kind, field(fm, "title") or name, body))
     found.sort()
-    head = f"{len(found)} notes edited in the last {a.hours:g} hours (claude.ai conversations, phone notes, Notion)."
+    head = f"{len(found)} notes edited in the last {a.hours:g} hours (claude.ai conversations, cloud sessions, phone notes, Notion)."
     notes = [f"=== {kind}: {title} (edited {datetime.fromtimestamp(t).strftime('%Y-%m-%d %H:%M')}) ===\n{clip(body)}" for t, kind, title, body in found]
     text = "\n\n".join([head] + notes)
     if len(text) > a.max_chars:

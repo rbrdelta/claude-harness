@@ -1,0 +1,6 @@
+[Unit]
+Description=Cloud sessions pull (claude -p + RemoteTrigger) into the vault
+
+[Service]
+Type=oneshot
+ExecStart=/home/rbr01/.claude/hooks/cloud-sessions-pull.sh
