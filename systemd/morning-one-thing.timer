@@ -1,0 +1,10 @@
+[Unit]
+Description=Morning message — the day's one thing at 07:30 (the asks moved to 15:00, 2026-11-22)
+
+[Timer]
+OnCalendar=*-*-* 07:30:00
+Persistent=true
+Unit=morning-one-thing.service
+
+[Install]
+WantedBy=timers.target

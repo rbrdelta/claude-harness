@@ -42,6 +42,7 @@ test('asks-launch: open asks start one named Remote Control session holding the 
   assert.match(cmd, /^\/opt\/claude --model opus --effort high --session-id [0-9a-f-]{36} --remote-control 'Asks: Fri, Nov 20 \(2 quick, 1 need your input\)' 'This session was opened automatically: 3 ask\(s\)/);
   assert.match(cmd, /search what he already said.*ask-drop.*quick ones first.*I need <answer> to unlock <work>.*ask-close <id> "<his answer>" --daily.*ask-stats.*session-time\.mjs \S+\.jsonl --log/);
   assert.match(cmd, /words that created each ask.*add the work item on a day.*drop the ask.*hold it for that day \(ds ask-add \.\.\. --on YYYY-MM-DD\)/, 'an ask he already decided is fixed in the record, not asked (2026-11-22)');
+  assert.match(cmd, /An input ask is not worked through in this session.*goes on his day as a block/, 'input asks become blocks (2026-11-22)');
   assert.ok(sb.dsCalls().includes(`ds ask-session --url ${URL1}`), 'the day is recorded once the session is up');
   assert.ok(!sb.exists('tmux/asks-2026-11-19'), "yesterday's unopened ask session is closed");
   assert.ok(sb.exists('tmux/retro-2026-11-16'), 'other sessions are left alone');
@@ -57,6 +58,12 @@ test('asks-launch: the link is read from the session transcript when the screen 
   assert.ok(sb.dsCalls().includes(`ds ask-session --url ${URL1}`));
   assert.equal(sb.notes().length, 1);
   assert.match(sb.read('launch.log'), /OK: launched asks-2026-11-20/);
+});
+
+test('asks-launch: an ask held for a later day is not counted in today\'s session', () => {
+  const sb = setup({ asks: [...ASKS, { id: 'h1', kind: 'quick', text: 'Held', on: '2026-11-25' }, { id: 'h2', kind: 'input', text: 'Due today', on: '2026-11-20' }] });
+  assert.equal(sb.launch().code, 0);
+  assert.match(sb.read('tmux/asks-2026-11-20'), /'Asks: Fri, Nov 20 \(2 quick, 2 need your input\)' 'This session was opened automatically: 4 ask\(s\)/);
 });
 
 test('asks-launch: at most one a day, and none when nothing is open', () => {

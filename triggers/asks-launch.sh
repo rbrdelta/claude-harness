@@ -1,5 +1,5 @@
 #!/bin/bash
-# Ask session launcher — systemd asks-launch.timer, 07:30, 08:30 and 09:30. Starts at most one session a day
+# Ask session launcher — systemd asks-launch.timer, 15:00, 16:00 and 17:00 (morning until 2026-11-22). Starts at most one session a day
 # with the open asks for Daniel to burn down (tools/asks-launch.mjs). Binaries resolved here, not via .bashrc.
 LOG_FILE="$HOME/.claude/hooks/asks-launch.log"
 export NVM_DIR="$HOME/.nvm"

@@ -1,8 +1,8 @@
 [Unit]
-Description=Ask session launcher — 07:30, with retries at 08:30 and 09:30
+Description=Ask session launcher — 15:00, with retries at 16:00 and 17:00 (moved from the morning 2026-11-22)
 
 [Timer]
-OnCalendar=*-*-* 07,08,09:30:00
+OnCalendar=*-*-* 15,16,17:00:00
 Persistent=true
 Unit=asks-launch.service
 

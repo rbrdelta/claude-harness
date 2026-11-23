@@ -3,7 +3,10 @@
 // items; they live as asks in the Daily Standard database (ds ask-add). Daniel: "If I'm not in a session with
 // you about a given topic, you can start one session max per day with a list that we need to burn down. These
 // are quick decisions ... and decisions that require me to actually sit down and provide input."
-//   asks-launch.mjs   run by asks-launch.timer (via triggers/asks-launch.sh) a few times each morning. Idempotent:
+// Daniel, 2026-11-22: the morning is for the day's one thing ("if you have a lot of asks, it can really derail
+// the morning"); the asks moved to 3pm "so it's available to complete towards the end of the day". The morning
+// gets only the one thing (tools/morning-one-thing.mjs).
+//   asks-launch.mjs   run by asks-launch.timer (via triggers/asks-launch.sh) at 15:00, retries 16:00 and 17:00. Idempotent:
 //                     at most one session a day, recorded in the database (ds ask-session), and none when no ask
 //                     is open. Starts a laptop session with Remote Control, already holding the list, and sends
 //                     Daniel the link on Telegram. Yesterday's unopened ask session is closed first, so one waits.
@@ -59,7 +62,8 @@ const save = () => writeFileSync(STATE, JSON.stringify(state, null, 2));
 const tries = state.failed[day] || 0;
 if (tries >= MAX_TRIES) process.exit(0);
 
-const asks = JSON.parse(ds('asks', '--json'));
+// asks --json also lists asks held for a later day (`on`); they are not today's.
+const asks = JSON.parse(ds('asks', '--json')).filter((a) => !(a.on && a.on > day));
 const quick = asks.filter((a) => a.kind === 'quick').length;
 const input = asks.length - quick;
 const sess = `asks-${day}`;
@@ -73,7 +77,7 @@ const prompt = [
   `This session was opened automatically: ${asks.length} ask(s) are waiting on Daniel, things Claude needs from him to unlock work.`,
   `Daniel, 2026-11-19: "you can start one session max per day with a list that we need to burn down. These are quick decisions ... and decisions that require me to actually sit down and provide input."`,
   `Get ready now, then stop and wait for him. 1) Run node ${DS} asks. 2) For each ask, first search what he already said (his CLAUDE.md rule 19: the project's files, the vault, earlier sessions); if the answer is on file, run ds ask-drop <id> "on file: <where>" and do not ask it. Read the words that created each ask as well (2026-11-22: two asks put to him were things he had already decided): if he asked for a task or a block, add the work item on a day, say where you put it, and drop the ask; if he said which day he wants it back, hold it for that day (ds ask-add ... --on YYYY-MM-DD) and do not ask it today.`,
-  `3) Open with the list, quick ones first: one line each, "I need <answer> to unlock <work>", with your recommendation so a quick one takes a yes or no. Then the ones that need his input: what you need from him and about how long it takes. Plain words, no ids in what he reads.`,
+  `3) Open with the list, quick ones first: one line each, "I need <answer> to unlock <work>", with your recommendation so a quick one takes a yes or no. Then the ones that need his input: what you need from him and about how long it takes. Plain words, no ids in what he reads. An input ask is not worked through in this session: with his yes, it goes on his day as a block (a work item with a day; you place it, he moves it), and the ask is closed with his words.`,
   `When he answers, record it in his words: node ${DS} ask-close <id> "<his answer>" --daily, and set the unlocked work item's next step. Anything he defers stays open for tomorrow's list.`,
   `His time is the measure (2026-11-21: one ask session took about 4.5 to 5 hours of his time, about 2.5 of them on nine rounds of one email; a 15-20 minute gap between messages is him reading, thinking and writing, not idle). Aim for 15 minutes of his time. Keep every reply short: answer what he asked, nothing else. When the list is done, or at about 15 minutes, say so and close.`,
   `Do the unlocked work after he is done, not with him in the session. Work that goes out under his name or needs his review (an email, an application answer, a page) comes back to him once, finished: first read /mnt/c/MCP/Meta/Voice — writing samples.md including "From his edits", pick the strongest example from the record yourself (never ask him for one), check every fact, and reread every sentence in his style. He gets one review round. If it misses, record his correction in "From his edits", redo it on your own, and put it on tomorrow's list instead of another round today.`,
