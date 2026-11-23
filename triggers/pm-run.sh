@@ -97,7 +97,7 @@ Steps:
 fi
 
 mkdir -p "$OUTPUT_DIR"
-# Close a retro whose Monday-Tuesday window has ended (deterministic, before the model runs).
+# Close a retro whose window (Sunday night through Tuesday) has ended (deterministic, before the model runs).
 [ "$KIND" = overnight ] && { node "$HOME/projects/active/claude-harness/tools/retro-window.mjs" expire >> "$LOG_FILE" 2>&1 || log "FAIL: retro-window expire"; }
 OUTPUT_FILE="$OUTPUT_DIR/pm-$KIND-$(date +%Y-%m-%d-%H%M).txt"
 log "START"

@@ -1,21 +1,27 @@
 #!/usr/bin/env node
 // Weekly retro window (Daniel, 2026-10-23). Prep runs Sunday; the retro then holds one Now slot
-// for Monday and Tuesday and closes as done (with Claude, via /retro) or as skipped.
+// through Tuesday and closes as done (with Claude, via /retro) or as skipped.
+// Sunday night is the default since 2026-11-22 (Daniel: "let's move the retro to trigger on Sunday night so we
+// start on Mondays with clear priorities when possible. It can still be pushed to Monday or Tuesday latest if
+// needed."): opening the window also asks retro-launch.mjs to start the retro session right away.
 //   retro-window.mjs open     end of the Sunday prep run: add "Retro — week of <Mon>" to Now. If Now is
 //                             already full, move the last Now item to Next and tell Daniel (no permission needed).
+//                             Then write the request file the launcher reads on its next run (within 5 minutes).
 //   retro-window.mjs expire   start of every overnight PM run: a retro still open once Tuesday has ended is
 //                             dropped as skipped, with the decisions it left open, and Daniel is asked why.
 //                             Not if Daniel has put it into a block on the Daily Standard (2026-10-28): a slotted
 //                             retro is scheduled, and retro-launch.mjs opens its session.
 // Both are idempotent. Telegram goes through telegram-notify.sh; a failed send is logged, never fatal.
 import { execFileSync } from 'node:child_process';
-import { readdirSync, readFileSync, appendFileSync } from 'node:fs';
+import { readdirSync, readFileSync, appendFileSync, writeFileSync } from 'node:fs';
 
 const HOME = process.env.HOME;
 const DS = process.env.RETRO_DS || `${HOME}/projects/active/daily-standard/scripts/ds.mjs`;
 const NOTIFY = process.env.RETRO_NOTIFY || `${HOME}/projects/active/claude-harness/tools/telegram-notify.sh`;
 const INBOX = process.env.RETRO_INBOX || '/mnt/c/MCP/Inbox';
 const LOG = process.env.RETRO_LOG || `${HOME}/.claude/hooks/retro-window.log`;
+// Read by retro-launch.mjs: start the session for this retro now, without waiting for a slot on the Daily Standard.
+const TONIGHT = process.env.RETRO_TONIGHT || `${HOME}/.claude/hooks/retro-tonight.json`;
 const NOW_CAP = 3;
 
 const ds = (...a) => execFileSync(process.execPath, [DS, ...a], { encoding: 'utf8' });
@@ -62,13 +68,18 @@ if (cmd === 'open') {
     moved = ` To make room, "${last.text}" moved from Now to Next.`;
   }
   const tue = new Date(d); tue.setDate(d.getDate() + 1);
+  const sun = new Date(d); sun.setDate(d.getDate() - 1);
   const prep = latestPrep();
-  const detail = `Window: Monday ${pretty(mon)} through Tuesday ${pretty(ymd(tue))}. Run /retro with Claude. Prep: ${prep ? prep.split('/').pop() : 'missing'}. If it is not closed by the end of Tuesday it is marked skipped, with the decisions it left open.`;
+  const detail = `Window: Sunday ${pretty(ymd(sun))} night when possible, so Monday starts with the week's outcomes set; Monday ${pretty(mon)} or Tuesday ${pretty(ymd(tue))} at the latest. Run /retro with Claude. Prep: ${prep ? prep.split('/').pop() : 'missing'}. If it is not closed by the end of Tuesday it is marked skipped, with the decisions it left open.`;
   // Every open item needs a workstream step since 2026-10-30 (ds refuses it otherwise); the retro is upkeep.
   if (existing) ds('task-set', key, 'tier=now', 'order=-1', 'step=upkeep', `detail=${detail}`);
   else ds('task-add', `Retro — week of ${pretty(mon)}`, '--project', 'Harness', '--tier', 'now', '--key', key, '--order', '-1', '--owner', 'Both', '--step', 'upkeep', '--detail', detail);
   log(`open: ${existing ? 'promoted' : 'added'} ${key}${moved}`);
-  notify(`Retro prep is ready. "Retro — week of ${pretty(mon)}" holds a Now slot Monday and Tuesday.${moved}`);
+  // The launcher starts the session and sends its link. A request that can't be written costs only the
+  // automatic start: the window is open either way, and the message below says how to start it by hand.
+  let starting = true;
+  try { writeFileSync(TONIGHT, JSON.stringify({ key, at: new Date().toISOString() })); } catch (e) { starting = false; log(`FAIL: could not write ${TONIGHT}: ${e.message.split('\n')[0]}`); }
+  notify(`Retro prep is ready. ${starting ? 'A retro session is starting; its link follows within 5 minutes.' : 'The retro session could not be started for you: run /retro in a session.'} Do it tonight if you can, so the week starts with its outcomes set; otherwise "Retro — week of ${pretty(mon)}" holds a Now slot through Tuesday.${moved}`);
 } else if (cmd === 'expire') {
   const open = items().filter((x) => /^retro-\d{4}-\d{2}-\d{2}$/.test(x.id) && x.status === 'open');
   const slotted = open.length ? new Set(JSON.parse(ds('slotted', 'retro-', '--json')).map((s) => s.taskId)) : new Set();

@@ -26,7 +26,7 @@ function setup(items, { notifyFails = false, slotted = '[]' } = {}) {
   sb.items = () => JSON.parse(sb.read('db.json'));
   sb.notes = () => sb.calls().filter((c) => c.startsWith('notify ')).map((c) => c.slice(7));
   sb.retro = (cmd) => sb.run(process.execPath, [join(REPO, 'tools/retro-window.mjs'), ...(cmd ? [cmd] : [])], {
-    env: { RETRO_DS: sb.path('ds.mjs'), RETRO_NOTIFY: sb.path('notify.sh'), RETRO_INBOX: sb.path('inbox'), RETRO_LOG: sb.path('retro.log'), FAKE_DS_DB: sb.path('db.json'), FAKE_SLOTTED: slotted },
+    env: { RETRO_DS: sb.path('ds.mjs'), RETRO_NOTIFY: sb.path('notify.sh'), RETRO_INBOX: sb.path('inbox'), RETRO_LOG: sb.path('retro.log'), RETRO_TONIGHT: sb.path('tonight.json'), FAKE_DS_DB: sb.path('db.json'), FAKE_SLOTTED: slotted },
   });
   return sb;
 }
@@ -44,9 +44,13 @@ test('retro-window open: adds "Retro — week of <Mon>" to Now at the top, owned
   assert.ok(r, `expected ${key}`);
   assert.match(r.text, /^Retro — week of [A-Z][a-z]{2} \d{1,2}$/);
   assert.equal(r.tier, 'now'); assert.equal(r.order, -1); assert.equal(r.owner, 'Both'); assert.equal(r.project, 'Harness'); assert.equal(r.step, 'upkeep', 'placed on the upkeep step, or ds refuses it');
-  assert.match(r.detail, /^Window: Monday .* through Tuesday .*Prep: Retro Prep — 2026-10-18\.md\. If it is not closed by the end of Tuesday it is marked skipped/);
+  assert.match(r.detail, /^Window: Sunday .* night when possible, so Monday starts with the week's outcomes set; Monday .* or Tuesday .* at the latest\. .*Prep: Retro Prep — 2026-10-18\.md\. If it is not closed by the end of Tuesday it is marked skipped/);
   assert.equal(sb.items().find((t) => t.id === 'a').tier, 'now', 'room left: nothing demoted');
-  assert.match(sb.notes()[0], /^Retro prep is ready\. "Retro — week of .*" holds a Now slot Monday and Tuesday\.$/);
+  assert.match(sb.notes()[0], /^Retro prep is ready\. A retro session is starting; its link follows within 5 minutes\. Do it tonight if you can, so the week starts with its outcomes set; otherwise "Retro — week of .*" holds a Now slot through Tuesday\.$/);
+  // Sunday night is the default (Daniel, 2026-11-22): the launcher is asked to start the session for this retro.
+  const req = JSON.parse(sb.read('tonight.json'));
+  assert.equal(req.key, key);
+  assert.ok(Date.now() - Date.parse(req.at) < 60000);
 });
 
 test('retro-window open: with Now full (3), the last Now item moves to Next and the message says so', () => {
@@ -76,7 +80,7 @@ test('retro-window open: a retro already added but moved to Next goes back to No
   sb.retro('open');
   const it = sb.items();
   const r = it.find((t) => t.id === key);
-  assert.equal(r.tier, 'now'); assert.match(r.detail, /^Window: Monday /);
+  assert.equal(r.tier, 'now'); assert.match(r.detail, /^Window: Sunday .* night when possible/);
   assert.equal(it.filter((t) => t.id === key).length, 1, 'no duplicate added');
   assert.equal(it.find((t) => t.id === 'c').tier, 'next');
   assert.match(sb.read('retro.log'), /open: promoted retro-/);
@@ -154,4 +158,18 @@ test('retro-window open: a late run on Tuesday opens this week (yesterday\'s Mon
   assert.ok(sb.items().some((t) => t.id === 'retro-2026-11-02'), 'Sunday Nov 1 -> the next day, Nov 2');
   assert.equal(run('2026-11-04').code, 0);
   assert.ok(sb.items().some((t) => t.id === 'retro-2026-11-09'), 'Wednesday -> the coming Monday');
+});
+
+test('retro-window open: a second run leaves no new start request; a request that cannot be written still opens the window and says how to start', () => {
+  const sb = setup([now('a', 1)]);
+  sb.retro('open');
+  sb.write('tonight.json', 'first');
+  sb.retro('open');
+  assert.equal(sb.read('tonight.json'), 'first', 'already open: no second request');
+  const blocked = setup([now('a', 1)]);
+  blocked.write('tonight.json/in-the-way', ''); // the request path is a folder, so writing it fails
+  assert.equal(blocked.retro('open').code, 0);
+  assert.ok(blocked.items().some((t) => t.id === `retro-${comingMonday()}`));
+  assert.match(blocked.notes()[0], /^Retro prep is ready\. The retro session could not be started for you: run \/retro in a session\. /);
+  assert.match(blocked.read('retro.log'), /FAIL: could not write .*tonight\.json/);
 });

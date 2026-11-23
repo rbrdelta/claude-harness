@@ -6,8 +6,13 @@
 //   retro-launch.mjs    run every 5 minutes by retro-launch.timer (via triggers/retro-launch.sh). Idempotent:
 //                       one session per retro item; moving it to another block opens no second one.
 // Telegram says when a session is ready (with its link) or when a launch failed. Retro only, by design.
+// Sunday night is the default since 2026-11-22 (Daniel: "let's move the retro to trigger on Sunday night so we
+// start on Mondays with clear priorities when possible. It can still be pushed to Monday or Tuesday latest if
+// needed."): when the Sunday prep opens the retro window, retro-window.mjs leaves a request file and the next run
+// here starts the session without waiting for a slot. If he then slots the retro for Monday or Tuesday, the
+// session already running is the one for the slot; if it is gone by then, a new one starts.
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync, appendFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, appendFileSync, rmSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { transcriptPath, linkFromTranscript, LINK_ON_SCREEN } from './rc-link.mjs';
 
@@ -16,6 +21,8 @@ const DS = process.env.RETRO_DS || `${HOME}/projects/active/daily-standard/scrip
 const NOTIFY = process.env.RETRO_NOTIFY || `${HOME}/projects/active/claude-harness/tools/telegram-notify.sh`;
 const LOG = process.env.RETRO_LOG || `${HOME}/.claude/hooks/retro-launch.log`;
 const STATE = process.env.RETRO_LAUNCH_STATE || `${HOME}/.claude/hooks/retro-launch-state.json`;
+const TONIGHT = process.env.RETRO_TONIGHT || `${HOME}/.claude/hooks/retro-tonight.json`; // written by retro-window.mjs open
+const TONIGHT_MAX_H = 12; // a request older than this is last week's, or a night that has passed
 const CLAUDE = process.env.RETRO_CLAUDE || 'claude';
 const WAIT_S = Number(process.env.RETRO_WAIT_S ?? 90); // how long Remote Control gets to come up
 const MAX_TRIES = 3;
@@ -62,15 +69,14 @@ for (const s of slotted.filter((x) => !RETRO_ID.test(x.taskId) && /^\s*(weekly\s
   notify(`"${s.text}" is on your Daily Standard for ${pretty(s.date)}, but it's linked to a work item that isn't the current retro, so no session was started. Pick the retro from the list again, or start /retro yourself.`);
 }
 
-for (const s of slotted.filter((x) => RETRO_ID.test(x.taskId))) {
-  if (state.launched[s.taskId]) continue;
-  const tries = state.failed[s.taskId] || 0;
-  if (tries >= MAX_TRIES) continue;
-  const slot = `${pretty(s.date)}, ${s.blocks.join(' + ')}`;
-  const name = `Retro: ${slot} (slotted by Daniel)`;
-  const sess = `retro-${s.taskId.slice(6)}`;
-  if (alive(sess)) { state.launched[s.taskId] = { slot, tmux: sess, at: new Date().toISOString(), adopted: true }; save(); log(`adopted running ${sess}`); continue; }
-  const prompt = `/retro This session was opened automatically because Daniel put the weekly retro (work item ${s.taskId}) into his Daily Standard for ${slot}. Get ready now: find and read the latest prep doc, then open with the first part of the walk-through and stop there. Daniel joins when the slot comes; wait for him.`;
+// Start one session for one retro item and record how it went. failKey counts the tries: a slot and the
+// prep-ready start count apart, so three failed tries on Sunday night don't use up the tries of a Monday slot.
+function start(taskId, { failKey, slot, name, prompt, ready, tonight = false }) {
+  const tries = state.failed[failKey] || 0;
+  if (tries >= MAX_TRIES) return;
+  const sess = `retro-${taskId.slice(6)}`;
+  const mark = tonight ? { tonight: true } : {};
+  if (alive(sess)) { state.launched[taskId] = { slot, tmux: sess, at: new Date().toISOString(), adopted: true, ...mark }; save(); log(`adopted running ${sess}`); return; }
   let url = null;
   const sid = randomUUID();
   const transcript = transcriptPath(HOME, HOME, sid);
@@ -83,16 +89,57 @@ for (const s of slotted.filter((x) => RETRO_ID.test(x.taskId))) {
     }
   } catch (e) { log(`tmux error: ${e.message.split('\n')[0]}`); }
   if (url) {
-    state.launched[s.taskId] = { slot, tmux: sess, url, at: new Date().toISOString() };
-    delete state.failed[s.taskId];
+    state.launched[taskId] = { slot, tmux: sess, url, at: new Date().toISOString(), ...mark };
+    delete state.failed[failKey];
     save();
     log(`OK: launched ${sess} for ${slot} ${url}`);
-    notify(`Your retro session is ready for ${slot}. Open "${name}" in the Claude app, or ${url}`);
+    notify(ready(url));
   } else {
     if (alive(sess)) { try { tmux('kill-session', '-t', `=${sess}`); } catch {} }
-    state.failed[s.taskId] = tries + 1;
+    state.failed[failKey] = tries + 1;
     save();
     log(`FAIL: ${sess} did not come up with Remote Control (try ${tries + 1} of ${MAX_TRIES})`);
     if (tries === 0) notify(`The retro session for ${slot} failed to start. It will retry twice more; if it still fails, start /retro yourself. Log: ~/.claude/hooks/retro-launch.log`);
   }
+}
+
+for (const s of slotted.filter((x) => RETRO_ID.test(x.taskId))) {
+  const was = state.launched[s.taskId];
+  // A session started when the prep was ready that is still running is the session for the slot too. One that
+  // is gone (the laptop restarted since Sunday night) is replaced, or the slot would open nothing.
+  if (was && !(was.tonight && !alive(was.tmux))) continue;
+  if (was) { delete state.launched[s.taskId]; save(); log(`${was.tmux}, started ${was.at} when the prep was ready, is gone; starting again for the slot`); }
+  const slot = `${pretty(s.date)}, ${s.blocks.join(' + ')}`;
+  const name = `Retro: ${slot} (slotted by Daniel)`;
+  start(s.taskId, {
+    failKey: s.taskId, slot, name,
+    prompt: `/retro This session was opened automatically because Daniel put the weekly retro (work item ${s.taskId}) into his Daily Standard for ${slot}. Get ready now: find and read the latest prep doc, then open with the first part of the walk-through and stop there. Daniel joins when the slot comes; wait for him.`,
+    ready: (url) => `Your retro session is ready for ${slot}. Open "${name}" in the Claude app, or ${url}`,
+  });
+}
+
+// The prep is ready (normally Sunday about 18:20): start the session now, unless he already gave the retro a slot.
+function tonightRequest() {
+  if (!existsSync(TONIGHT)) return null;
+  try {
+    const r = JSON.parse(readFileSync(TONIGHT, 'utf8'));
+    const age = Date.now() - Date.parse(r.at);
+    return RETRO_ID.test(r.key || '') && age >= 0 && age < TONIGHT_MAX_H * 3600e3 ? r : null;
+  } catch (e) {
+    log(`WARN: ${TONIGHT} could not be read (${e.message.split('\n')[0]}); removed, no session started from it`);
+    rmSync(TONIGHT, { force: true });
+    return null;
+  }
+}
+const req = tonightRequest();
+if (req && !state.launched[req.key] && !slotted.some((s) => s.taskId === req.key)) {
+  const d = new Date();
+  const today = process.env.RETRO_TODAY || `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const slot = `${pretty(today)}, prep ready`;
+  const name = `Retro: ${slot}`;
+  start(req.key, {
+    failKey: `${req.key}/prep-ready`, slot, name, tonight: true,
+    prompt: `/retro This session was opened automatically because the weekly retro prep is ready (work item ${req.key}). Daniel wants the retro on Sunday night when possible, so Monday starts with the week's outcomes set; it can move to Monday, or Tuesday at the latest. Get ready now: find and read the latest prep doc, then open with the first part of the walk-through and stop there. Daniel joins when he can; wait for him.`,
+    ready: (url) => `Your retro session is ready. Open "${name}" in the Claude app, or ${url} . Tonight if you can; it waits for you through Tuesday.`,
+  });
 }

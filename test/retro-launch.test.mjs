@@ -21,7 +21,7 @@ case "$1" in
 esac`);
   sb.notes = () => sb.calls().filter((c) => c.startsWith('notify ')).map((c) => c.slice(7));
   sb.launch = () => sb.run(process.execPath, [join(REPO, 'tools/retro-launch.mjs')], {
-    env: { RETRO_DS: sb.path('ds.mjs'), RETRO_NOTIFY: sb.path('notify.sh'), RETRO_LOG: sb.path('launch.log'), RETRO_LAUNCH_STATE: sb.path('state.json'), RETRO_CLAUDE: '/opt/claude', FAKE_SLOTTED: JSON.stringify(slotted) },
+    env: { RETRO_DS: sb.path('ds.mjs'), RETRO_NOTIFY: sb.path('notify.sh'), RETRO_LOG: sb.path('launch.log'), RETRO_LAUNCH_STATE: sb.path('state.json'), RETRO_CLAUDE: '/opt/claude', FAKE_SLOTTED: JSON.stringify(slotted), RETRO_TONIGHT: sb.path('tonight.json'), RETRO_TODAY: '2026-11-29' },
   });
   sb.state = () => JSON.parse(sb.read('state.json'));
   return sb;
@@ -131,4 +131,82 @@ test('retro-launch: any other ds failure is not retried, and its full error is l
   assert.equal(sb.launch().code, 1);
   assert.equal(dsCalls(sb), 1);
   assert.match(sb.read('launch.log'), /FAIL: ds slotted \(try 1 of 3\): Error: D1 query failed: \[\{"code":7500\}\] \| at query \(d1\.mjs:27:1\)/);
+});
+
+// Sunday night is the default (Daniel, 2026-11-22): the prep run leaves a request and the session starts with no slot.
+const request = (sb, key = 'retro-2026-11-30', hoursAgo = 0) => sb.write('tonight.json', JSON.stringify({ key, at: new Date(Date.now() - hoursAgo * 3600e3).toISOString() }));
+
+test('retro-launch: when the prep is ready, a session starts with no slot, named for the day, and Telegram gets the link once', () => {
+  const sb = setup([]);
+  request(sb);
+  assert.equal(sb.launch().code, 0);
+  const cmd = sb.read('tmux/retro-2026-11-30');
+  assert.match(cmd, /^\/opt\/claude --session-id [0-9a-f-]{36} --remote-control 'Retro: Sun, Nov 29, prep ready' '\/retro This session was opened automatically because the weekly retro prep is ready \(work item retro-2026-11-30\)/);
+  assert.match(cmd, /Sunday night when possible.*Monday, or Tuesday at the latest.*Daniel joins when he can; wait for him\.'$/);
+  assert.equal(sb.state().launched['retro-2026-11-30'].tonight, true);
+  assert.equal(sb.state().launched['retro-2026-11-30'].url, URL1);
+  assert.deepEqual(sb.notes(), [`Your retro session is ready. Open "Retro: Sun, Nov 29, prep ready" in the Claude app, or ${URL1} . Tonight if you can; it waits for you through Tuesday.`]);
+  sb.launch();
+  assert.equal(sb.calls().filter((c) => c.includes('new-session')).length, 1, 'a second run opens nothing');
+  assert.equal(sb.notes().length, 1);
+});
+
+test('retro-launch: a prep-ready request older than 12 hours, for something that is not a retro, or unreadable starts nothing', () => {
+  const old = setup([]);
+  request(old, 'retro-2026-11-30', 13);
+  old.launch();
+  const other = setup([]);
+  request(other, 'abc123');
+  other.launch();
+  const broken = setup([]);
+  broken.write('tonight.json', '{not json');
+  assert.equal(broken.launch().code, 0);
+  for (const sb of [old, other, broken]) { assert.ok(!sb.calls().some((c) => c.includes('new-session'))); assert.equal(sb.notes().length, 0); }
+  assert.ok(!broken.exists('tonight.json'), 'an unreadable request is removed, so it is logged once');
+  assert.match(broken.read('launch.log'), /WARN: .*tonight\.json could not be read/);
+});
+
+test('retro-launch: a retro he already gave a slot gets the slot session only, not a second one when the prep is ready', () => {
+  const sb = setup([slot('retro-2026-11-30', '2026-11-30', ['morning'])]);
+  request(sb);
+  sb.launch();
+  sb.launch();
+  assert.equal(sb.calls().filter((c) => c.includes('new-session')).length, 1);
+  assert.match(sb.read('tmux/retro-2026-11-30'), /--remote-control 'Retro: Mon, Nov 30, morning \(slotted by Daniel\)'/);
+  assert.equal(sb.state().launched['retro-2026-11-30'].tonight, undefined);
+});
+
+test('retro-launch: pushed to Monday — the Sunday session still running serves the slot; one that is gone is started again', () => {
+  const sunday = setup([]);
+  request(sunday);
+  sunday.launch();
+  // Still running when he slots it for Monday: nothing new, no second message.
+  const running = setup([slot('retro-2026-11-30', '2026-11-30', ['morning'])]);
+  running.write('state.json', sunday.read('state.json'));
+  running.write('tmux/retro-2026-11-30', 'running');
+  running.launch();
+  assert.ok(!running.calls().some((c) => c.includes('new-session')));
+  assert.equal(running.notes().length, 0);
+  // Gone (the laptop restarted): the slot starts a new one, and from then on it is an ordinary slot session.
+  const gone = setup([slot('retro-2026-11-30', '2026-11-30', ['morning'])]);
+  gone.write('state.json', sunday.read('state.json'));
+  gone.launch();
+  assert.match(gone.read('tmux/retro-2026-11-30'), /--remote-control 'Retro: Mon, Nov 30, morning \(slotted by Daniel\)'/);
+  assert.match(gone.notes()[0], /^Your retro session is ready for Mon, Nov 30, morning\./);
+  assert.match(gone.read('launch.log'), /is gone; starting again for the slot/);
+  gone.launch();
+  assert.equal(gone.calls().filter((c) => c.includes('new-session')).length, 1);
+});
+
+test('retro-launch: three failed tries on Sunday night do not use up a Monday slot', () => {
+  const sunday = setup([], { url: false });
+  request(sunday);
+  for (let i = 0; i < 4; i++) sunday.launch();
+  assert.equal(sunday.calls().filter((c) => c.includes('new-session')).length, 3);
+  assert.equal(sunday.notes().length, 1);
+  assert.match(sunday.notes()[0], /^The retro session for Sun, Nov 29, prep ready failed to start\./);
+  const monday = setup([slot('retro-2026-11-30', '2026-11-30', ['morning'])]);
+  monday.write('state.json', sunday.read('state.json'));
+  monday.launch();
+  assert.equal(monday.state().launched['retro-2026-11-30'].url, URL1);
 });

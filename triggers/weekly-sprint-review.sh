@@ -1,6 +1,7 @@
 #!/bin/bash
 # Weekly Retro Prep — systemd weekly-sprint-review.timer, Sundays 18:00.
-# On success it opens the retro window: the retro holds one Now slot Monday and Tuesday (tools/retro-window.mjs).
+# On success it opens the retro window (tools/retro-window.mjs): the retro session starts right away, for Sunday
+# night (Daniel, 2026-11-22), and the retro holds one Now slot through Tuesday.
 # Outputs a PREP DOC (data + open questions) for Daniel to walk through via /retro.
 # Claude's read is allowed, marked as such; Daniel's conclusions come from the live /retro session.
 
