@@ -8,9 +8,10 @@ What he said matters most: "the harder problem to solve is either important item
 
 1. The items file named at the bottom: a JSON list of {id, source, where, written, text}. Each item is only the text that is new since the day before (a phone note's added lines, a message he typed in a session, a claude.ai turn, a Notion page, a cloud-session message).
 2. The context file named at the bottom: open and recent work items (id, status, project, title), open asks to Daniel, and the outcomes this pipeline recorded in the last 14 days (so you can see what was already raised or closed).
-3. `/mnt/c/MCP/Inbox/Intake pipeline — design and gold set.md`: his decisions, his graded examples (round 1, with his corrections in his words) and the rules learned. His corrections outrank anything below.
+3. `/mnt/c/MCP/Inbox/Intake pipeline — design and gold set.md`: his decisions, his graded examples (rounds 1 and 2, with his corrections in his words) and the rules learned. His corrections outrank anything below.
+4. `/home/rbr01/.claude/CLAUDE.md`: the rules already written. A rule he states that is already there (in substance) is on file: route it H with `exists` naming the rule ("CLAUDE.md: <rule name>"), not C.
 
-Read nothing else. Never open anything under /mnt/c/MCP/Confidential/.
+Read nothing else besides these four. Never open anything under /mnt/c/MCP/Confidential/.
 
 ## Routes
 
