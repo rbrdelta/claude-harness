@@ -6,7 +6,8 @@
 # (no silent drops, quotes must be his exact words, secrets removed) and records an outcome for every piece in
 # ~/.claude/intake/outcomes.jsonl and the vault note Inbox/Intake — outcomes.md.
 # G pieces are confirmed from the session record by a second pass (triggers/intake/verify-g.md); unconfirmed ones are raised.
-# PREVIEW MODE until Daniel signs off on the gold set: nothing is written to the backlog or asks.
+# LIVE since 2026-11-22: `intake.mjs apply` places routed pieces in Daily Standard (build ideas with a plan-now-or-later ask,
+# to-dos, questions; Claude's own follow-ups as one item a day). INTAKE_MODE=preview records only.
 #
 #   run.sh                    today's bundle
 #   run.sh <bundle.json>…     specific bundles (backfill), each its own pass
@@ -15,7 +16,7 @@ DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 TOOL="$DIR/../../tools/intake.mjs"
 WORK="${INTAKE_WORK:-$HOME/.local/state/claude-intake/runs}"  # outside ~/.claude: Claude Code refuses model writes there
 SCRUB_WORK="${SCRUB_WORK:-$HOME/.claude/thought-scrub/work}"
-MODE="${INTAKE_MODE:-preview}"
+MODE="${INTAKE_MODE:-live}"  # live since 2026-11-22 (Daniel: "What else is left before we push this to live")
 log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $1" >> "$LOG_FILE"; }
 fail() { log "FAIL: $1"; exit 1; }
 
@@ -57,6 +58,10 @@ Output file: $RUN/gcheck.json"
     fi
     C=$(node "$TOOL" check "$RUN" 2>&1) || { log "FAIL: $(basename "$B"): check: $C"; rc=1; continue; }
     R=$(node "$TOOL" record "$RUN" --mode "$MODE" 2>&1) || { log "FAIL: $(basename "$B"): record: $R"; rc=1; continue; }
+    if [ "$MODE" = live ]; then
+        A=$(node "$TOOL" apply "$RUN" 2>&1) || { log "FAIL: $(basename "$B"): apply: $A"; rc=1; continue; }
+        R="$R; $A"
+    fi
     log "OK: $(basename "$B") ($MODE): $R | ${C#*; }"
 done
 find "$WORK" -mindepth 1 -maxdepth 1 -mtime +30 -exec rm -rf {} + 2>/dev/null

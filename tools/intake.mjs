@@ -247,6 +247,93 @@ function record(dir, mode) {
   return `${checked.outcomes.length} pieces: ` + Object.keys(ROUTES).map(k => `${k} ${n(k)}`).join(', ') + `; ${checked.problems.length} problem(s)`;
 }
 
+// ---- apply: put each routed piece where it belongs (live mode) ----
+// Daniel 11/22: "all of the things in review are not showing up in my daily standard so it feels like important
+// priorities are left out." Individual items only for what is real work: build ideas (unranked, with a quick
+// "plan now or later?" ask), to-dos, questions Claude answers. Claude's own follow-ups (rules to record, notes to
+// file, "check it was done") go into ONE Claude item per day so his list stays clean. Ideas (E) already reach the
+// retro review through the thought scrub. G and H are recorded only. Idempotent: applied.json remembers what was made.
+const APPLIED = path.join(STATE, 'applied.json');
+function dsRun(args) {
+  return execFileSync('node', [DS, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 60000 }).trim();
+}
+const madeId = (out) => (out.match(/\b(?:incoming|asked|added|ask)\s+([0-9a-z-]{6,})/) || out.match(/\b([0-9a-f]{12})\b/) || [])[1] || '';
+
+// Daniel's gold-set grades override the router for the pieces he graded (~/.claude/intake/overrides.json, {id: route}).
+// recheckBefore (YYYY-MM-DD, backfill only): pieces from earlier days may have been done since, so their items and asks
+// become "check still needed" follow-ups for Claude instead of landing on his list.
+export function planApply(outcomes, overrides = {}, recheckBefore = '') {
+  const items = [], asks = [], daily = new Map();
+  const live = outcomes.filter(o => !String(o.mode || '').startsWith('baseline'));
+  const bundles = new Map();
+  for (const o0 of live) {
+    const o = overrides[o0.id] ? { ...o0, routes: [overrides[o0.id]] } : o0;
+    const r = o.routes[0], day = String(o.id).split('#')[0];
+    const his = o.quote ? ` His words: "${o.quote}".` : '';
+    const src = `${o.source}, ${o.where}, ${o.written}`;
+    const followUp = (what) => { if (!daily.has(day)) daily.set(day, []); daily.get(day).push(`${what}: ${o.title}${o.where_to ? ` (to: ${o.where_to})` : ''}.${his} [${o.id}]`); };
+    if (o.flags.includes('missed by router')) { followUp('Route by hand (the router gave no outcome)'); continue; }
+    if (/^Check it was done/.test(o.title)) { followUp('Check it was done'); continue; }
+    if (o.exists && ['A', 'B', 'D'].includes(r)) continue; // on file: nothing new
+    if (recheckBefore && day < recheckBefore && ['A', 'B', 'D'].includes(r)) { followUp(`Check still needed (${({ A: 'build idea', B: 'to-do', D: 'question' })[r]}), then place it`); continue; }
+    if (r === 'A') {
+      items.push({ key: `${o.id}:A`, text: `Build idea: ${o.title}`, owner: 'Daniel', project: o.where_to || '',
+        detail: `Build idea, unranked until Daniel says plan it now or later (the quick ask that comes with it).${his} From ${src}. ${o.reason}`,
+        ask: { text: `Plan this build idea now or later? ${o.title}`, kind: 'quick', unlocks: `Build idea: ${o.title}` } });
+    } else if (r === 'B') {
+      items.push({ key: `${o.id}:B`, text: o.title, owner: o.owner === 'Claude' ? 'Claude' : 'Daniel', project: o.where_to || '', detail: `${o.reason}${his} From ${src}.` });
+    } else if (r === 'D' && o.kind === 'introspection') {
+      asks.push({ key: `${o.id}:D`, text: `Yours to think through: ${o.title}`, kind: 'input', unlocks: o.where_to || 'your own read', his });
+    } else if (r === 'D') {
+      const b = o.bundle || o.id;
+      if (!bundles.has(b)) bundles.set(b, []);
+      bundles.get(b).push(o);
+    } else if (r === 'C') followUp('Record the rule');
+    else if (r === 'F') followUp('File in project notes');
+  }
+  for (const [b, os] of bundles) {
+    items.push({ key: `D:${b}:${os.map(o => o.id).join(',')}`, text: `Answer: ${os.length > 1 ? b : os[0].title}`, owner: 'Claude', project: os[0].where_to || '',
+      detail: `Find the answer and bring it to the daily session (Daniel 11/21: "just bring the answer to me"). Questions: ${os.map(o => `${o.title}${o.quote ? ` ("${o.quote}")` : ''} [${o.id}]`).join('; ')}` });
+  }
+  if (process.env.INTAKE_ONE_FOLLOWUP && daily.size > 1) { // backfill: one follow-up item for the whole span
+    const days = [...daily.keys()].sort(), all = days.flatMap(d => daily.get(d).map(l => `${d}: ${l}`));
+    daily.clear(); daily.set(`${days[0]} to ${days[days.length - 1]}`, all);
+  }
+  for (const [day, lines] of daily) {
+    items.push({ key: `daily:${day}:${lines.length}`, text: `Intake follow-ups from ${day} (${lines.length})`, owner: 'Claude', project: 'Claude Harness',
+      detail: `Claude's own follow-ups the intake pipeline found in what Daniel wrote on ${day}. Never his to do.\n- ${lines.join('\n- ')}` });
+  }
+  return { items, asks };
+}
+
+function apply(dir) {
+  const checked = readJSON(path.join(dir, 'checked.json'), null);
+  if (!checked) throw new Error('no checked.json');
+  const done = readJSON(APPLIED, {});
+  const { items, asks } = planApply(checked.outcomes, readJSON(path.join(STATE, 'overrides.json'), {}), process.env.INTAKE_RECHECK_BEFORE || '');
+  let made = 0, askd = 0;
+  for (const it of items) {
+    if (done[it.key]) continue;
+    const out = dsRun(['incoming-add', it.text.slice(0, 120), '--detail', it.detail.slice(0, 3500), '--from', `intake ${it.key}`, ...(it.project ? ['--project', it.project.slice(0, 60)] : [])]);
+    const id = madeId(out);
+    if (!id) throw new Error(`incoming-add gave no id: ${out}`);
+    if (it.owner === 'Claude') dsRun(['task-set', id, 'owner=Claude']);
+    done[it.key] = { id, at: new Date().toISOString() }; made++;
+    if (it.ask) {
+      const a = dsRun(['ask-add', it.ask.text.slice(0, 200), '--unlocks', it.ask.unlocks.slice(0, 120), '--kind', it.ask.kind, '--task', id, '--from', 'intake']);
+      done[it.key].ask = madeId(a); askd++;
+    }
+    writeJSON(APPLIED, done);
+  }
+  for (const a of asks) {
+    if (done[a.key]) continue;
+    const out = dsRun(['ask-add', a.text.slice(0, 200), '--unlocks', a.unlocks.slice(0, 120), '--kind', a.kind, '--from', 'intake']);
+    done[a.key] = { ask: madeId(out), at: new Date().toISOString() }; askd++;
+    writeJSON(APPLIED, done);
+  }
+  return `${made} item(s), ${askd} ask(s) placed`;
+}
+
 // ---- gold-set sheet ----
 export function sampleSheet(all, n = 30, seed = 1) {
   let s = seed; const rand = () => ((s = (s * 16807) % 2147483647) / 2147483647);
@@ -288,12 +375,14 @@ function main() {
     console.log(`${c.outcomes.length} outcomes; problems: ${c.problems.length ? c.problems.join('; ') : 'none'}`);
   } else if (cmd === 'record') {
     console.log(record(rest[0], flag('--mode', 'preview')));
+  } else if (cmd === 'apply') {
+    console.log(apply(rest[0]));
   } else if (cmd === 'sheet') {
     const days = Number(flag('--days', 7)), n = Number(flag('--n', 30));
     const all = recentOutcomes(Date.now(), days);
     console.log(JSON.stringify(sampleSheet(all, n), null, 1));
   } else {
-    console.error('usage: intake.mjs prepare <bundle> <dir> | evidence <dir> | check <dir> | record <dir> [--mode preview] | sheet [--days 7] [--n 30]');
+    console.error('usage: intake.mjs prepare <bundle> <dir> | evidence <dir> | check <dir> | record <dir> [--mode preview] | apply <dir> | sheet [--days 7] [--n 30]');
     process.exit(2);
   }
 }

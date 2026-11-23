@@ -177,3 +177,40 @@ test('intake: a G with no record found is Claude\'s to chase, never raised to Da
   assert.equal(o.owner, 'Claude');
   assert.ok(o.flags.includes('no session record found'));
 });
+
+// ---- live placing (2026-11-22) ----
+const O = (id, routes, extra = {}) => ({ id, routes, title: `t ${id}`, quote: 'q', source: 'Phone Notes', where: 'n', written: id.slice(0, 10), flags: [], owner: '', exists: '', reason: 'r', where_to: '', ...extra });
+
+test('intake: placing makes items only for real work; Claude\'s own follow-ups become one item a day', () => {
+  const p = mod.planApply([
+    O('2026-11-21#1', ['A']), O('2026-11-21#2', ['B'], { owner: 'Daniel' }), O('2026-11-21#3', ['B'], { owner: 'Claude' }),
+    O('2026-11-21#4', ['D'], { kind: 'research', bundle: 'paper' }), O('2026-11-21#5', ['D'], { kind: 'research', bundle: 'paper' }),
+    O('2026-11-21#6', ['D'], { kind: 'introspection' }), O('2026-11-21#7', ['C']), O('2026-11-21#8', ['F']),
+    O('2026-11-21#9', ['B'], { owner: 'Claude', title: 'Check it was done: x' }), O('2026-11-21#10', ['E']),
+    O('2026-11-21#11', ['G']), O('2026-11-21#12', ['H']), O('2026-11-21#13', ['B'], { exists: 'aaaaaaaaaaaa' }),
+    O('2026-11-21#14', ['H'], { flags: ['missed by router'] }),
+  ]);
+  const texts = p.items.map(i => i.text);
+  assert.ok(texts.includes('Build idea: t 2026-11-21#1'));
+  assert.equal(p.items.find(i => i.text.startsWith('Build idea')).ask.kind, 'quick', 'a build idea comes with its plan-now-or-later ask');
+  assert.equal(p.items.find(i => i.text === 't 2026-11-21#2').owner, 'Daniel');
+  assert.equal(p.items.find(i => i.text === 't 2026-11-21#3').owner, 'Claude');
+  assert.equal(p.items.filter(i => i.text.startsWith('Answer:')).length, 1, 'bundled questions become one answer item');
+  assert.deepEqual(p.asks.map(a => a.kind), ['input'], 'a question his to think through is an ask, not an item');
+  const daily = p.items.filter(i => i.text.startsWith('Intake follow-ups'));
+  assert.equal(daily.length, 1);
+  assert.equal(daily[0].owner, 'Claude');
+  assert.match(daily[0].detail, /Record the rule/); assert.match(daily[0].detail, /File in project notes/);
+  assert.match(daily[0].detail, /Check it was done/); assert.match(daily[0].detail, /Route by hand/);
+  assert.ok(!texts.some(t => /#1[0-3]$/.test(t)), 'ideas (via the thought scrub), G, H and pieces on file make nothing');
+  assert.equal(p.items.length, 5);
+});
+
+test('intake: his grades override the router; older backfill is rechecked by Claude; baseline is never placed', () => {
+  const outcomes = [O('2026-11-20#1', ['B'], { owner: 'Claude' }), O('2026-11-18#1', ['A']), O('2026-11-15#1', ['A'], { mode: 'baseline (first full read)' })];
+  const p = mod.planApply(outcomes, { '2026-11-20#1': 'H' }, '2026-11-20');
+  assert.ok(!p.items.some(i => i.text === 't 2026-11-20#1'), 'graded H: nothing placed');
+  assert.ok(!p.items.some(i => i.text.startsWith('Build idea')), 'an old build idea is rechecked first, not placed');
+  assert.match(p.items[0].detail, /Check still needed \(build idea\)/);
+  assert.ok(!JSON.stringify(p).includes('2026-11-15#1'));
+});
