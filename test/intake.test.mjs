@@ -166,3 +166,14 @@ test('intake: evidence finds what the session did after his message, and the rep
   writeFileSync(join(dir, 'note.md'), '# t\n\n## Conversation\n\n**You** _(t1)_\n\nOk how do they check it?\n\n---\n\n**Claude** _(t2)_\n\nHere is how.\n\n---\n\n**You** _(t3)_\n\nlater');
   assert.match(mod.afterInNote(join(dir, 'note.md'), 'Ok how do they check it?'), /Here is how/);
 });
+
+test('intake: a G with no record found is Claude\'s to chase, never raised to Daniel', () => {
+  const items = mod.prepareItems(BUNDLE, '2026-11-20');
+  const routes = [{ id: '2026-11-20#4', routes: ['G'], title: 'Where is the ranking' }];
+  const g = [{ id: '2026-11-20#4', confirmed: 'no', note: 'record is empty', route_if_not: 'D' }];
+  const ev = [{ id: '2026-11-20#4', what_happened_after: null }];
+  const o = mod.checkRoutes(items, routes, null, g, ev).outcomes.find(x => x.id === '2026-11-20#4');
+  assert.deepEqual(o.routes, ['B']);
+  assert.equal(o.owner, 'Claude');
+  assert.ok(o.flags.includes('no session record found'));
+});

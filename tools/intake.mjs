@@ -71,9 +71,10 @@ function buildContext(now = Date.now()) {
 }
 
 // ---- check ----
-export function checkRoutes(items, routes, context = null, gcheck = null) {
+export function checkRoutes(items, routes, context = null, gcheck = null, evidence = null) {
   const known = context ? new Set([...(context.work_items || []).map(t => t.id), ...(context.open_asks || []).map(x => x.id)]) : null;
   const gby = new Map((Array.isArray(gcheck) ? gcheck : []).map(g => [g.id, g]));
+  const noRecord = new Set((Array.isArray(evidence) ? evidence : []).filter(e => !e.what_happened_after).map(e => e.id));
   const byId = new Map(items.map(i => [i.id, i]));
   const out = [], problems = [];
   for (let r of Array.isArray(routes) ? routes : []) {
@@ -96,10 +97,12 @@ export function checkRoutes(items, routes, context = null, gcheck = null) {
     if (gcheck && rs.length === 1 && rs[0] === 'G') {
       const g = gby.get(r.id);
       if (!g || g.confirmed !== 'yes') {
-        const to = (g && /^[A-F]$/.test(String(g.route_if_not || ''))) ? g.route_if_not : 'B';
+        // No record found is not proof it was missed: Claude chases it, it never goes to Daniel (11/22: repeat noise).
+        const to = noRecord.has(r.id) ? 'B' : (g && /^[A-F]$/.test(String(g.route_if_not || ''))) ? g.route_if_not : 'B';
+        if (noRecord.has(r.id)) flags.push('no session record found');
         rs = [to];
         flags.push(g ? `not confirmed done (${g.confirmed}): ${redact(g.note || '').text.slice(0, 160)}` : 'not confirmed done: no session record found');
-        if (to === 'B') r = { ...r, owner: 'Claude', title: `Check it was done: ${r.title || ''}` };
+        if (to === 'B') r = { ...r, owner: 'Claude', title: `Check it was done: ${String(r.title || '').replace(/^Check it was done: /, '')}` };
       }
     }
     out.push({ id: r.id, source: item.source, where: item.where, written: item.written, routes: rs.slice(0, 2),
@@ -140,6 +143,22 @@ const humanText = (d) => {
   return t && !t.trimStart().startsWith('<') ? t : null;
 };
 
+function recentSessionFiles(written) {
+  const day = Date.parse(written || '') || Date.now();
+  const out = [];
+  if (!fs.existsSync(PROJECTS)) return out;
+  for (const d of fs.readdirSync(PROJECTS)) {
+    const dir = path.join(PROJECTS, d);
+    let names; try { names = fs.readdirSync(dir); } catch { continue; }
+    for (const n of names) {
+      if (!n.endsWith('.jsonl')) continue;
+      const f = path.join(dir, n);
+      try { const m = fs.statSync(f).mtimeMs; if (m >= day - DAY && m <= day + 4 * DAY) out.push(f); } catch {}
+    }
+  }
+  return out;
+}
+
 // The assistant's text and actions after his message, until his next message.
 export function afterInSession(file, text, cap = 6000) {
   const want = norm(text).slice(0, 80);
@@ -176,6 +195,8 @@ export function gatherEvidence(items, outcomes) {
     if (it.source === 'Claude Code') {
       const f = sessionFile((String(it.where).match(/session ([0-9a-f]{8})/) || [])[1]);
       if (f) after = afterInSession(f, it.text);
+      // A session continued after a context reset keeps its turns in another file: look there too.
+      if (!after) for (const g of recentSessionFiles(it.written)) { if (g === f) continue; after = afterInSession(g, it.text); if (after) break; }
     } else if (it.source === 'Claude.ai') {
       after = afterInNote(path.join(VAULT, 'Sources/Claude-Conversations', `${it.where}.md`), it.text);
     } else if (it.source === 'Cloud session') {
@@ -262,7 +283,7 @@ function main() {
     const items = readJSON(path.join(dir, 'items.json'), []);
     const routes = readJSON(path.join(dir, 'routes.json'), null);
     if (!Array.isArray(routes)) { console.error('routes.json missing or not a JSON array'); process.exit(1); }
-    const c = checkRoutes(items, routes, readJSON(path.join(dir, 'context.json'), null), readJSON(path.join(dir, 'gcheck.json'), fs.existsSync(path.join(dir, 'evidence.json')) ? [] : null));
+    const c = checkRoutes(items, routes, readJSON(path.join(dir, 'context.json'), null), readJSON(path.join(dir, 'gcheck.json'), fs.existsSync(path.join(dir, 'evidence.json')) ? [] : null), readJSON(path.join(dir, 'evidence.json'), null));
     writeJSON(path.join(dir, 'checked.json'), c);
     console.log(`${c.outcomes.length} outcomes; problems: ${c.problems.length ? c.problems.join('; ') : 'none'}`);
   } else if (cmd === 'record') {
