@@ -214,3 +214,20 @@ test('intake: his grades override the router; older backfill is rechecked by Cla
   assert.match(p.items[0].detail, /Check still needed \(build idea\)/);
   assert.ok(!JSON.stringify(p).includes('2026-11-15#1'));
 });
+
+test('intake: an open question the record shows answered or decided in the moment places nothing', () => {
+  const items = mod.prepareItems(BUNDLE, '2026-11-20');
+  const routes = [{ id: '2026-11-20#1', routes: ['D'], kind: 'research' }, { id: '2026-11-20#4', routes: ['D'], kind: 'research' }];
+  const g = [{ id: '2026-11-20#1', confirmed: 'yes', note: 'he decided: stay out of daily standard' }, { id: '2026-11-20#4', confirmed: 'no', note: 'no answer' }];
+  const { outcomes } = mod.checkRoutes(items, routes, null, g, []);
+  const by = Object.fromEntries(outcomes.map(o => [o.id, o]));
+  assert.deepEqual(by['2026-11-20#1'].routes, ['G']);
+  assert.ok(by['2026-11-20#1'].flags.some(f => /answered or decided in the moment/.test(f)));
+  assert.deepEqual(by['2026-11-20#4'].routes, ['D'], 'an unanswered question stays open');
+  assert.equal(mod.gatherEvidence(items, [{ id: '2026-11-20#1', routes: ['D'], reason: '' }])[0].claim, 'open question');
+});
+
+test('intake: corrections are counted by week and kind (his kill signal)', () => {
+  const rows = [{ at: '2026-11-22T10:00:00Z', kind: 'repeat' }, { at: '2026-11-22T11:00:00Z', kind: 'drop' }, { at: '2026-11-23T09:00:00Z', kind: 'repeat' }];
+  assert.deepEqual(mod.correctionsSummary(rows), ['week of 2026-11-16: 1 repeat, 1 drop, 0 label (total 2)', 'week of 2026-11-23: 1 repeat, 0 drop, 0 label (total 1)']);
+});

@@ -35,6 +35,7 @@ One item can take two routes (round 1 #1: a build idea and a research thread). O
 - Day-job material (JPMC: his current team, internal projects, CRM, RBAC at work) is never a build idea or a to-do here: route H with flag "day-job", unless it is job-search material (interview stories go to F, project "job search").
 - Personal (family, health, money, relationships): route H with flag "personal" and no quote.
 - Secrets (keys, tokens, passwords): route H with flag "secret" and no quote.
+- Corrections count. When the piece is Daniel correcting something Claude or this pipeline raised or placed ("we already decided that", "why is this here", "move this", "you already answered this", "that was a miss"), add the flag "correction:repeat" (a decided or closed thing raised again), "correction:drop" (something real was missed) or "correction:label" (put in the wrong place). His kill signal is how often this happens week to week.
 
 ## Output
 
@@ -50,6 +51,6 @@ Write a JSON array to the output file named below, nothing else. Every item id m
  "owner": "Daniel" | "Claude" (A and B only),
  "exists": "<work item id, ask id or note it duplicates, else empty>",
  "reason": "<one plain line: why this route>",
- "flags": ["personal" | "day-job" | "secret" | "not his words"]}
+ "flags": ["personal" | "day-job" | "secret" | "not his words" | "correction:repeat" | "correction:drop" | "correction:label"]}
 
 Plain words, no shorthand. When unsure between raising something and not, ask which costs him more: a dropped real item is worse than one extra item, but an item already on file or already closed must never come back.

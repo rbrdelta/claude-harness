@@ -94,7 +94,10 @@ export function checkRoutes(items, routes, context = null, gcheck = null, eviden
     const cited = String(r.exists || '').match(/\b[0-9a-f]{12}\b/g) || [];
     if (known && cited.some(id => !known.has(id))) { flags.push('on-file id not found'); problems.push(`${r.id}: cites ${cited.filter(id => !known.has(id)).join(', ')} not in context`); }
     // G is a claim only the session record can prove (round 2, rule 10): unproven is raised, never dropped.
-    if (gcheck && rs.length === 1 && rs[0] === 'G') {
+    // A question answered or decided in the moment is not open: nothing to place (11/22).
+    if (gcheck && rs.length === 1 && rs[0] === 'D' && gby.get(r.id)?.confirmed === 'yes') {
+      rs = ['G']; flags.push(`answered or decided in the moment: ${redact(gby.get(r.id).note || '').text.slice(0, 160)}`);
+    } else if (gcheck && rs.length === 1 && rs[0] === 'G') {
       const g = gby.get(r.id);
       if (!g || g.confirmed !== 'yes') {
         // No record found is not proof it was missed: Claude chases it, it never goes to Daniel (11/22: repeat noise).
@@ -189,7 +192,8 @@ export function afterInNote(file, text, cap = 6000) {
 
 export function gatherEvidence(items, outcomes) {
   const byId = new Map(items.map(i => [i.id, i]));
-  return outcomes.filter(o => o.routes.length === 1 && o.routes[0] === 'G').map(o => {
+  // G claims and D questions: was it done, answered or decided in the moment? (11/22: a decided question came back)
+  return outcomes.filter(o => o.routes.length === 1 && (o.routes[0] === 'G' || o.routes[0] === 'D')).map(o => {
     const it = byId.get(o.id) || {};
     let after = null;
     if (it.source === 'Claude Code') {
@@ -205,7 +209,7 @@ export function gatherEvidence(items, outcomes) {
       const done = String(it.text).split('\n').filter(l => /── Claude, (done|question)/.test(l));
       after = done.length ? done.join('\n') : null;
     }
-    return { id: o.id, source: it.source, his_words: clip(it.text || '', 1500), router_said: o.reason, what_happened_after: after };
+    return { id: o.id, claim: o.routes[0] === 'G' ? 'handled in the moment' : 'open question', source: it.source, his_words: clip(it.text || '', 1500), router_said: o.reason, what_happened_after: after };
   });
 }
 
@@ -243,6 +247,12 @@ function record(dir, mode) {
   const all = fs.readFileSync(OUTCOMES, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l));
   fs.mkdirSync(path.dirname(NOTE), { recursive: true });
   fs.writeFileSync(NOTE, renderOutcomesNote(all));
+  // Corrections the router spotted in his words feed the kill-signal count (deduped by piece id).
+  const logged = new Set(fs.existsSync(CORRECTIONS) ? fs.readFileSync(CORRECTIONS, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l).id).filter(Boolean) : []);
+  for (const o of checked.outcomes) {
+    const c = (o.flags || []).find(f => /^correction:(repeat|drop|label)$/.test(f));
+    if (c && !logged.has(o.id)) fs.appendFileSync(CORRECTIONS, JSON.stringify({ at, kind: c.split(':')[1], what: o.title, words: o.quote || '', id: o.id }) + '\n');
+  }
   const n = (k) => checked.outcomes.filter(o => o.routes.includes(k)).length;
   return `${checked.outcomes.length} pieces: ` + Object.keys(ROUTES).map(k => `${k} ${n(k)}`).join(', ') + `; ${checked.problems.length} problem(s)`;
 }
@@ -334,6 +344,20 @@ function apply(dir) {
   return `${made} item(s), ${askd} ask(s) placed`;
 }
 
+// ---- corrections: Daniel's kill signal, counted (11/22: "How do we track these? This is a red flag.") ----
+// kind: repeat (a decided or closed thing raised again), drop (a real thing missed), label (put in the wrong place).
+const CORRECTIONS = path.join(STATE, 'corrections.jsonl');
+export function correctionsSummary(rows, now = Date.now()) {
+  const weeks = new Map();
+  for (const r of rows) {
+    const d = new Date(r.at); const monday = new Date(d); monday.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+    const k = monday.toISOString().slice(0, 10);
+    if (!weeks.has(k)) weeks.set(k, { repeat: 0, drop: 0, label: 0 });
+    weeks.get(k)[r.kind] = (weeks.get(k)[r.kind] || 0) + 1;
+  }
+  return [...weeks.entries()].sort().map(([w, c]) => `week of ${w}: ${c.repeat} repeat, ${c.drop} drop, ${c.label} label (total ${c.repeat + c.drop + c.label})`);
+}
+
 // ---- gold-set sheet ----
 export function sampleSheet(all, n = 30, seed = 1) {
   let s = seed; const rand = () => ((s = (s * 16807) % 2147483647) / 2147483647);
@@ -375,6 +399,15 @@ function main() {
     console.log(`${c.outcomes.length} outcomes; problems: ${c.problems.length ? c.problems.join('; ') : 'none'}`);
   } else if (cmd === 'record') {
     console.log(record(rest[0], flag('--mode', 'preview')));
+  } else if (cmd === 'correction') {
+    const [kind, what, words] = rest;
+    if (!['repeat', 'drop', 'label'].includes(kind) || !what) { console.error('usage: intake.mjs correction repeat|drop|label "<what happened>" "<his words>"'); process.exit(2); }
+    fs.mkdirSync(STATE, { recursive: true });
+    fs.appendFileSync(CORRECTIONS, JSON.stringify({ at: new Date().toISOString(), kind, what, words: words || '' }) + '\n');
+    console.log(`recorded ${kind}`);
+  } else if (cmd === 'corrections') {
+    const rows = fs.existsSync(CORRECTIONS) ? fs.readFileSync(CORRECTIONS, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l)) : [];
+    console.log(rows.length ? correctionsSummary(rows).join('\n') : 'no corrections recorded');
   } else if (cmd === 'apply') {
     console.log(apply(rest[0]));
   } else if (cmd === 'sheet') {
