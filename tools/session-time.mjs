@@ -5,6 +5,9 @@
 // / RATE. RATE was set from the 2026-11-21 ask session: about 6,600 words in and out against the 4.5 to 5 hours
 // he put in (his own figure of 1h05m for the first round, 1,719 words, gives 26 a minute; the whole day gives 23).
 //   session-time.mjs <transcript.jsonl> [--log <file>]
+// 2026-11-22, Daniel: "I would start the timer from my first response." The line now leads with the clock from his
+// first message to the last message in the session (him or Claude); the word estimate stays beside it, since it
+// also counts the opening list he read before replying.
 // Prints one line for Daniel. With --log, keeps one JSON line per session in that file (replaced on rerun),
 // so sessions can be compared over time.
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
@@ -18,7 +21,7 @@ const strip = (s) => s.replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, 
 const LAUNCHER = /^This session was opened automatically/;
 
 export function count(jsonl) {
-  let read = 0, wrote = 0, mine = 0, first = null, last = null;
+  let read = 0, wrote = 0, mine = 0, first = null, last = null, end = null;
   for (const line of jsonl.split('\n')) {
     let d; try { d = JSON.parse(line); } catch { continue; }
     if (d.type !== 'user' && d.type !== 'assistant') continue;
@@ -30,17 +33,20 @@ export function count(jsonl) {
     }
     if (typeof c !== 'string' || !c.trim()) continue;
     const text = strip(c).trim();
+    if (first && d.timestamp && d.timestamp > (end || '')) end = d.timestamp;
     if (d.type === 'assistant') { read += words(text); continue; }
     if (LAUNCHER.test(text) || text.startsWith('<command-')) continue;
     wrote += words(text); mine += 1;
     first ??= d.timestamp; last = d.timestamp;
+    if (d.timestamp && d.timestamp > (end || '')) end = d.timestamp;
   }
-  return { read, wrote, messages: mine, first, last, minutes: Math.round((read + wrote) / RATE) };
+  const clock = first && end ? Math.round((Date.parse(end) - Date.parse(first)) / 60000) : null;
+  return { read, wrote, messages: mine, first, last, end, clock, minutes: Math.round((read + wrote) / RATE) };
 }
 
 const fmt = (m) => (m < 60 ? `${m} minutes` : `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`);
 export const line = (r) =>
-  `Your time this session, estimated: about ${fmt(r.minutes)} (you read ${r.read.toLocaleString('en-US')} words of mine and wrote ${r.wrote.toLocaleString('en-US')}, at ${RATE} words a minute, set from 2026-11-21's session).`;
+  `Your time this session: about ${r.clock == null ? 'unknown' : fmt(r.clock)} from your first message to the last. Word estimate, which also counts the list you read before replying: about ${fmt(r.minutes)} (${r.read.toLocaleString('en-US')} words read, ${r.wrote.toLocaleString('en-US')} written, at ${RATE} a minute).`;
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const [file, flag, logFile] = process.argv.slice(2);

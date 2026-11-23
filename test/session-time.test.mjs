@@ -28,6 +28,7 @@ test('counts only Claude replies he read and messages he wrote', () => {
   assert.equal(r.minutes, Math.round(560 / RATE));
   assert.equal(r.first, '2026-11-21T10:00:00Z');
   assert.equal(r.last, '2026-11-21T11:00:00Z');
+  assert.equal(r.clock, 60, 'the clock starts at his first message (2026-11-22)');
 });
 
 test('prints one line and keeps one log row per session, replaced on rerun', () => {
@@ -37,7 +38,7 @@ test('prints one line and keeps one log row per session, replaced on rerun', () 
   writeFileSync(file, jsonl);
   const tool = new URL('../tools/session-time.mjs', import.meta.url).pathname;
   const out = execFileSync('node', [tool, file, '--log', log], { encoding: 'utf8' });
-  assert.match(out, /^Your time this session, estimated: about \d+ minutes \(you read 490 words of mine and wrote 70/);
+  assert.match(out, /^Your time this session: about 1h 00m from your first message to the last\. Word estimate, which also counts the list you read before replying: about \d+ minutes \(490 words read, 70 written/);
   execFileSync('node', [tool, file, '--log', log]);
   const lines = readFileSync(log, 'utf8').trim().split('\n');
   assert.equal(lines.length, 1);
