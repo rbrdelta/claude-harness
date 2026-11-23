@@ -1,0 +1,10 @@
+[Unit]
+Description=Trial tally — 23:50 nightly, catches up after sleep
+
+[Timer]
+OnCalendar=*-*-* 23:50:00
+Persistent=true
+Unit=trial-tally.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,6 @@
+[Unit]
+Description=Trial tally — one line a day comparing the trial plan with what got done (stack rank rounds note)
+
+[Service]
+Type=oneshot
+ExecStart=/home/rbr01/.claude/hooks/trial-tally.sh
