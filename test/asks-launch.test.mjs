@@ -39,7 +39,7 @@ test('asks-launch: open asks start one named Remote Control session holding the 
   const sb = setup({ running: ['asks-2026-11-19', 'retro-2026-11-16'] });
   assert.equal(sb.launch().code, 0);
   const cmd = sb.read('tmux/asks-2026-11-20');
-  assert.match(cmd, /^\/opt\/claude --session-id [0-9a-f-]{36} --remote-control 'Asks: Fri, Nov 20 \(2 quick, 1 need your input\)' 'This session was opened automatically: 3 ask\(s\)/);
+  assert.match(cmd, /^\/opt\/claude --model opus --effort high --session-id [0-9a-f-]{36} --remote-control 'Asks: Fri, Nov 20 \(2 quick, 1 need your input\)' 'This session was opened automatically: 3 ask\(s\)/);
   assert.match(cmd, /search what he already said.*ask-drop.*quick ones first.*I need <answer> to unlock <work>.*ask-close <id> "<his answer>" --daily.*ask-stats.*session-time\.mjs \S+\.jsonl --log/);
   assert.match(cmd, /words that created each ask.*add the work item on a day.*drop the ask.*hold it for that day \(ds ask-add \.\.\. --on YYYY-MM-DD\)/, 'an ask he already decided is fixed in the record, not asked (2026-11-22)');
   assert.ok(sb.dsCalls().includes(`ds ask-session --url ${URL1}`), 'the day is recorded once the session is up');
@@ -52,7 +52,7 @@ test('asks-launch: open asks start one named Remote Control session holding the 
 test('asks-launch: the link is read from the session transcript when the screen has lost it (the 11-19 to 11-21 failure)', () => {
   const sb = setup({ url: 'transcript' });
   assert.equal(sb.launch().code, 0);
-  assert.match(sb.read('tmux/asks-2026-11-20'), /^\/opt\/claude --session-id [0-9a-f-]{36} --remote-control /);
+  assert.match(sb.read('tmux/asks-2026-11-20'), /^\/opt\/claude --model opus --effort high --session-id [0-9a-f-]{36} --remote-control /);
   assert.ok(sb.exists('tmux/asks-2026-11-20'), 'a session that came up is left running');
   assert.ok(sb.dsCalls().includes(`ds ask-session --url ${URL1}`));
   assert.equal(sb.notes().length, 1);

@@ -18,6 +18,10 @@ const NOTIFY = process.env.ASKS_NOTIFY || `${HOME}/projects/active/claude-harnes
 const LOG = process.env.ASKS_LOG || `${HOME}/.claude/hooks/asks-launch.log`;
 const STATE = process.env.ASKS_LAUNCH_STATE || `${HOME}/.claude/hooks/asks-launch-state.json`;
 const CLAUDE = process.env.ASKS_CLAUDE || 'claude';
+// Daniel, 2026-11-22: ask sessions run on Opus at high effort, not on the laptop's default (Fable at extra high).
+// Passed as flags so the session never inherits the default from settings.json.
+const MODEL = process.env.ASKS_MODEL || 'opus';
+const EFFORT = process.env.ASKS_EFFORT || 'high';
 const TIME = `${HOME}/projects/active/claude-harness/tools/session-time.mjs`;
 const TIME_LOG = process.env.ASKS_TIME_LOG || `${HOME}/.claude/hooks/asks-session-time.jsonl`;
 const WAIT_S = Number(process.env.ASKS_WAIT_S ?? 90);
@@ -78,7 +82,7 @@ const prompt = [
 
 let url = null;
 try {
-  if (!alive(sess)) tmux('new-session', '-d', '-s', sess, '-c', HOME, `${CLAUDE} --session-id ${sid} --remote-control ${sq(name)} ${sq(prompt)}`);
+  if (!alive(sess)) tmux('new-session', '-d', '-s', sess, '-c', HOME, `${CLAUDE} --model ${MODEL} --effort ${EFFORT} --session-id ${sid} --remote-control ${sq(name)} ${sq(prompt)}`);
   for (let t = 0; t < WAIT_S && !url; t += 5) {
     sleep(5);
     if (!alive(sess)) break;
