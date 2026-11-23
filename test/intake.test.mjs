@@ -100,17 +100,14 @@ test('intake: prepare -> check -> record writes the outcome log and the vault no
   assert.ok(note.indexOf('**A**') < note.indexOf('**G**'), 'routed pieces are listed before the no-action ones');
 });
 
-test('intake: the gold-set sheet takes every routed piece and at least ten no-action ones, no duplicates', () => {
+test('intake: the gold-set sheet mixes routed and no-action pieces, never G, no duplicates', () => {
   const mk = (i, r) => ({ id: `2026-11-20#${i}`, routes: r, title: `t${i}` });
-  const all = [...Array.from({ length: 8 }, (_, i) => mk(i + 1, ['B'])), ...Array.from({ length: 40 }, (_, i) => mk(i + 9, ['G']))];
-  const sheet = mod.sampleSheet([...all, all[0]], 30);
-  assert.equal(sheet.length, 30);
-  assert.equal(sheet.filter(o => o.routes[0] === 'B').length, 8);
-  assert.equal(new Set(sheet.map(o => o.id)).size, 30);
-  const many = Array.from({ length: 50 }, (_, i) => mk(i + 1, ['E']));
-  const quiet = Array.from({ length: 40 }, (_, i) => ({ id: `2026-11-21#${i + 1}`, routes: ['G'], title: `q${i}` }));
-  const s2 = mod.sampleSheet([...many, ...quiet], 30);
-  assert.equal(s2.filter(o => o.routes[0] === 'G').length, 10, 'quiet pieces are always sampled, to catch silent drops');
+  const all = [...Array.from({ length: 8 }, (_, i) => mk(i + 1, ['B'])), ...Array.from({ length: 20 }, (_, i) => mk(i + 9, ['H'])), ...Array.from({ length: 20 }, (_, i) => mk(i + 29, ['G']))];
+  const sheet = mod.sampleSheet([...all, all[0]], 15);
+  assert.equal(sheet.length, 15);
+  assert.equal(sheet.filter(o => o.routes[0] === 'G').length, 0, 'G is never his to grade');
+  assert.ok(sheet.filter(o => o.routes[0] === 'H').length >= 5, 'enough no-action pieces to catch drops');
+  assert.equal(new Set(sheet.map(o => o.id)).size, 15);
 });
 
 // ---- round 2 (2026-11-22): G must be proven from the record; "on file" must exist ----

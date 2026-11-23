@@ -9,7 +9,7 @@
 //                                     an item the router skipped or a quote that is not his exact words is flagged
 //   record <dir> [--mode preview]     append to ~/.claude/intake/outcomes.jsonl and rewrite the vault note
 //                                     Inbox/Intake — outcomes.md (what happened to each piece, last 14 days)
-//   sheet [--days 7] [--n 30]         a gold-set sheet to grade: every routed item, then a sample of the "no action" ones
+//   sheet [--days 7] [--n 15]         a gold-set sheet to grade: routed pieces plus no-action (H) ones; never G
 //
 // Preview mode (until Daniel signs off): outcomes are recorded and shown, nothing is written to the backlog or asks.
 import fs from 'fs';
@@ -364,9 +364,10 @@ export function sampleSheet(all, n = 30, seed = 1) {
   const seen = new Set();
   const uniq = all.filter(o => { const k = o.id + o.title; if (seen.has(k)) return false; seen.add(k); return true; });
   const routed = uniq.filter(o => !o.routes.every(r => r === 'G' || r === 'H'));
-  const quiet = uniq.filter(o => o.routes.every(r => r === 'G' || r === 'H'));
+  // G is never his to grade (11/22: "only you know if it was done in the moment"); the pipeline proves it instead.
+  const quiet = uniq.filter(o => o.routes.every(r => r === 'H'));
   const pick = (arr, k) => { const a = [...arr]; const out = []; while (a.length && out.length < k) out.push(a.splice(Math.floor(rand() * a.length), 1)[0]); return out; };
-  const nQuiet = Math.min(quiet.length, Math.max(10, n - routed.length));
+  const nQuiet = Math.min(quiet.length, Math.max(Math.ceil(n / 3), n - routed.length)); // enough no-action pieces to catch drops
   const chosen = [...pick(routed, n - nQuiet), ...pick(quiet, nQuiet)];
   return chosen.sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
 }
