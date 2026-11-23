@@ -112,3 +112,57 @@ test('intake: the gold-set sheet takes every routed piece and at least ten no-ac
   const s2 = mod.sampleSheet([...many, ...quiet], 30);
   assert.equal(s2.filter(o => o.routes[0] === 'G').length, 10, 'quiet pieces are always sampled, to catch silent drops');
 });
+
+// ---- round 2 (2026-11-22): G must be proven from the record; "on file" must exist ----
+test('intake: an on-file id that is not in the context is flagged', () => {
+  const items = mod.prepareItems(BUNDLE, '2026-11-20');
+  const ctx = { work_items: [{ id: 'aaaaaaaaaaaa' }], open_asks: [{ id: 'bbbbbbbbbbbb' }] };
+  const { outcomes } = mod.checkRoutes(items, [
+    { id: '2026-11-20#1', routes: ['H'], exists: 'aaaaaaaaaaaa' },
+    { id: '2026-11-20#4', routes: ['H'], exists: 'cccccccccccc (the ranking item)' },
+  ], ctx);
+  assert.deepEqual(outcomes[0].flags, []);
+  assert.ok(outcomes.find(o => o.id === '2026-11-20#4').flags.includes('on-file id not found'));
+});
+
+test('intake: a G the record does not confirm is raised, never kept as handled', () => {
+  const items = mod.prepareItems(BUNDLE, '2026-11-20');
+  const routes = [
+    { id: '2026-11-20#1', routes: ['G'], title: 'a' }, { id: '2026-11-20#2', routes: ['G'], title: 'b' },
+    { id: '2026-11-20#3', routes: ['G'], title: 'c' }, { id: '2026-11-20#4', routes: ['G'], title: 'Where is the ranking' },
+  ];
+  const g = [
+    { id: '2026-11-20#1', confirmed: 'yes', note: 'answered' },
+    { id: '2026-11-20#2', confirmed: 'partly', note: 'only half sent', route_if_not: 'B' },
+    { id: '2026-11-20#3', confirmed: 'no', note: 'a rule he stated', route_if_not: 'C' },
+  ];
+  const { outcomes } = mod.checkRoutes(items, routes, null, g);
+  const by = Object.fromEntries(outcomes.map(o => [o.id, o]));
+  assert.deepEqual(by['2026-11-20#1'].routes, ['G']);
+  assert.deepEqual(by['2026-11-20#2'].routes, ['B']);
+  assert.equal(by['2026-11-20#2'].owner, 'Claude', 'an unfinished request is Claude\'s to finish, not his to grade');
+  assert.match(by['2026-11-20#2'].title, /^Check it was done/);
+  assert.deepEqual(by['2026-11-20#3'].routes, ['C']);
+  assert.deepEqual(by['2026-11-20#4'].routes, ['B'], 'no check at all for a G means it is raised');
+  assert.ok(by['2026-11-20#4'].flags.some(f => /no session record/.test(f)));
+  assert.deepEqual(mod.checkRoutes(items, routes, null, null).outcomes[0].routes, ['G'], 'without the G step (tests, old runs) G stands');
+});
+
+test('intake: evidence finds what the session did after his message, and the reply under his turn in a note', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'intake-ev-'));
+  const rows = [
+    { type: 'user', origin: { kind: 'human' }, message: { content: 'Where’s the backlog ranking we discussed yesterday' } },
+    { type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Read', input: { file_path: '/vault/Stack rank.md' } }, { type: 'text', text: 'It is in Stack rank — rounds.md.' }] } },
+    { type: 'user', toolUseResult: {}, message: { content: [{ type: 'tool_result', content: 'x' }] } },
+    { type: 'user', origin: { kind: 'human' }, message: { content: 'next question' } },
+    { type: 'assistant', message: { content: [{ type: 'text', text: 'not part of the first answer' }] } },
+  ];
+  writeFileSync(join(dir, 'abcd1234-0000.jsonl'), rows.map(r => JSON.stringify(r)).join('\n'));
+  const after = mod.afterInSession(join(dir, 'abcd1234-0000.jsonl'), 'Where’s the backlog ranking we discussed yesterday');
+  assert.match(after, /\[Read: \/vault\/Stack rank\.md\]/);
+  assert.match(after, /It is in Stack rank/);
+  assert.doesNotMatch(after, /not part of the first answer/);
+  assert.equal(mod.afterInSession(join(dir, 'abcd1234-0000.jsonl'), 'never said this'), null);
+  writeFileSync(join(dir, 'note.md'), '# t\n\n## Conversation\n\n**You** _(t1)_\n\nOk how do they check it?\n\n---\n\n**Claude** _(t2)_\n\nHere is how.\n\n---\n\n**You** _(t3)_\n\nlater');
+  assert.match(mod.afterInNote(join(dir, 'note.md'), 'Ok how do they check it?'), /Here is how/);
+});

@@ -5,6 +5,7 @@
 # One Opus pass routes each piece (triggers/intake/prompt.md); tools/intake.mjs prepares the input, checks the output
 # (no silent drops, quotes must be his exact words, secrets removed) and records an outcome for every piece in
 # ~/.claude/intake/outcomes.jsonl and the vault note Inbox/Intake — outcomes.md.
+# G pieces are confirmed from the session record by a second pass (triggers/intake/verify-g.md); unconfirmed ones are raised.
 # PREVIEW MODE until Daniel signs off on the gold set: nothing is written to the backlog or asks.
 #
 #   run.sh                    today's bundle
@@ -42,6 +43,18 @@ Output file: $RUN/routes.json"
     OUT=$(cd "$RUN" && claude -p "$PROMPT" --model opus --tools "Read,Write" --allowedTools "Read" \
         --permission-mode acceptEdits --strict-mcp-config --mcp-config '{"mcpServers":{}}' < /dev/null 2>&1)
     [ -s "$RUN/routes.json" ] || { log "FAIL: $(basename "$B"): router wrote no routes.json | $(echo "$OUT" | tail -c 300 | tr '\n' ' ')"; rc=1; continue; }
+    # G is a claim only the session record can prove (Daniel 11/22): gather what happened after each G message,
+    # and have a Sonnet pass confirm it. No gcheck.json means every G is treated as unconfirmed and raised.
+    E=$(node "$TOOL" evidence "$RUN" 2>&1) || { log "FAIL: $(basename "$B"): evidence: $E"; rc=1; continue; }
+    if [ "${E%% *}" != "0" ]; then
+        GPROMPT="$(cat "$DIR/verify-g.md")
+
+Evidence file: $RUN/evidence.json
+Output file: $RUN/gcheck.json"
+        (cd "$RUN" && claude -p "$GPROMPT" --model sonnet --tools "Read,Write" --allowedTools "Read" \
+            --permission-mode acceptEdits --strict-mcp-config --mcp-config '{"mcpServers":{}}' < /dev/null > /dev/null 2>&1)
+        [ -s "$RUN/gcheck.json" ] || log "WARN: $(basename "$B"): G check wrote nothing; every G is raised as unconfirmed"
+    fi
     C=$(node "$TOOL" check "$RUN" 2>&1) || { log "FAIL: $(basename "$B"): check: $C"; rc=1; continue; }
     R=$(node "$TOOL" record "$RUN" --mode "$MODE" 2>&1) || { log "FAIL: $(basename "$B"): record: $R"; rc=1; continue; }
     log "OK: $(basename "$B") ($MODE): $R | ${C#*; }"

@@ -71,10 +71,12 @@ function buildContext(now = Date.now()) {
 }
 
 // ---- check ----
-export function checkRoutes(items, routes) {
+export function checkRoutes(items, routes, context = null, gcheck = null) {
+  const known = context ? new Set([...(context.work_items || []).map(t => t.id), ...(context.open_asks || []).map(x => x.id)]) : null;
+  const gby = new Map((Array.isArray(gcheck) ? gcheck : []).map(g => [g.id, g]));
   const byId = new Map(items.map(i => [i.id, i]));
   const out = [], problems = [];
-  for (const r of Array.isArray(routes) ? routes : []) {
+  for (let r of Array.isArray(routes) ? routes : []) {
     const item = byId.get(r.id);
     if (!item) { problems.push(`unknown id ${r.id}`); continue; }
     let rs = (Array.isArray(r.routes) ? r.routes : [r.routes]).map(x => String(x || '').trim().toUpperCase()).filter(x => ROUTES[x]);
@@ -87,6 +89,19 @@ export function checkRoutes(items, routes) {
       quote = '';
     }
     if (item.secret_removed && !flags.includes('secret')) flags.push('secret');
+    // "On file" must point at something that exists (round 2, rule 11).
+    const cited = String(r.exists || '').match(/\b[0-9a-f]{12}\b/g) || [];
+    if (known && cited.some(id => !known.has(id))) { flags.push('on-file id not found'); problems.push(`${r.id}: cites ${cited.filter(id => !known.has(id)).join(', ')} not in context`); }
+    // G is a claim only the session record can prove (round 2, rule 10): unproven is raised, never dropped.
+    if (gcheck && rs.length === 1 && rs[0] === 'G') {
+      const g = gby.get(r.id);
+      if (!g || g.confirmed !== 'yes') {
+        const to = (g && /^[A-F]$/.test(String(g.route_if_not || ''))) ? g.route_if_not : 'B';
+        rs = [to];
+        flags.push(g ? `not confirmed done (${g.confirmed}): ${redact(g.note || '').text.slice(0, 160)}` : 'not confirmed done: no session record found');
+        if (to === 'B') r = { ...r, owner: 'Claude', title: `Check it was done: ${r.title || ''}` };
+      }
+    }
     out.push({ id: r.id, source: item.source, where: item.where, written: item.written, routes: rs.slice(0, 2),
       ...(r.kind ? { kind: r.kind } : {}), ...(r.bundle ? { bundle: r.bundle } : {}),
       title: redact(r.title || '').text.slice(0, 120), quote: quote.slice(0, 400), where_to: r.where_to || '', owner: r.owner || '',
@@ -101,6 +116,76 @@ export function checkRoutes(items, routes) {
     problems.push(`${it.id}: missed by router`);
   }
   return { outcomes: out.sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true })), problems };
+}
+
+// ---- G evidence: what actually happened right after his message ----
+const PROJECTS = process.env.INTAKE_PROJECTS || `${HOME}/.claude/projects`;
+const clip = (t, n) => (t.length > n ? t.slice(0, n) + ' …' : t);
+
+function sessionFile(id8) {
+  if (!id8 || !fs.existsSync(PROJECTS)) return null;
+  for (const d of fs.readdirSync(PROJECTS)) {
+    const dir = path.join(PROJECTS, d);
+    let names; try { names = fs.readdirSync(dir); } catch { continue; }
+    const f = names.find(n => n.startsWith(id8) && n.endsWith('.jsonl'));
+    if (f) return path.join(dir, f);
+  }
+  return null;
+}
+
+const humanText = (d) => {
+  if (d.type !== 'user' || d.toolUseResult || d.isMeta) return null;
+  const c = d.message?.content;
+  const t = typeof c === 'string' ? c : Array.isArray(c) ? c.filter(b => b?.type === 'text').map(b => b.text).join('\n') : '';
+  return t && !t.trimStart().startsWith('<') ? t : null;
+};
+
+// The assistant's text and actions after his message, until his next message.
+export function afterInSession(file, text, cap = 6000) {
+  const want = norm(text).slice(0, 80);
+  const rows = fs.readFileSync(file, 'utf8').split('\n').filter(Boolean).map(l => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+  const start = rows.findIndex(d => { const t = humanText(d); return t && norm(t).startsWith(want.slice(0, 60)); });
+  if (start < 0) return null;
+  const out = [];
+  for (const d of rows.slice(start + 1)) {
+    if (humanText(d) && (d.origin?.kind === 'human' || !d.origin)) break;
+    for (const b of (d.type === 'assistant' && Array.isArray(d.message?.content)) ? d.message.content : []) {
+      if (b.type === 'text' && b.text.trim()) out.push(b.text.trim());
+      if (b.type === 'tool_use') out.push(`[${b.name}: ${clip(norm(b.input?.description || b.input?.command || b.input?.file_path || b.input?.action || ''), 120)}]`);
+    }
+  }
+  return clip(out.join('\n'), cap);
+}
+
+// The reply after his turn in a Claude.ai or cloud-session note (same **You** / **Claude** layout).
+export function afterInNote(file, text, cap = 6000) {
+  if (!fs.existsSync(file)) return null;
+  const turns = fs.readFileSync(file, 'utf8').split(/\n---\n/);
+  const want = norm(text).slice(0, 60);
+  const i = turns.findIndex(t => /\*\*You\*\*/.test(t) && norm(t).includes(want));
+  if (i < 0) return null;
+  const reply = turns.slice(i + 1).find(t => /\*\*Claude\*\*/.test(t));
+  return reply ? clip(reply.trim(), cap) : null;
+}
+
+export function gatherEvidence(items, outcomes) {
+  const byId = new Map(items.map(i => [i.id, i]));
+  return outcomes.filter(o => o.routes.length === 1 && o.routes[0] === 'G').map(o => {
+    const it = byId.get(o.id) || {};
+    let after = null;
+    if (it.source === 'Claude Code') {
+      const f = sessionFile((String(it.where).match(/session ([0-9a-f]{8})/) || [])[1]);
+      if (f) after = afterInSession(f, it.text);
+    } else if (it.source === 'Claude.ai') {
+      after = afterInNote(path.join(VAULT, 'Sources/Claude-Conversations', `${it.where}.md`), it.text);
+    } else if (it.source === 'Cloud session') {
+      after = afterInNote(path.join(VAULT, 'Sources/Cloud-Sessions', `${it.where}.md`), it.text);
+    } else if (it.source === 'Phone Notes') {
+      const done = String(it.text).split('\n').filter(l => /── Claude, (done|question)/.test(l));
+      after = done.length ? done.join('\n') : null;
+    }
+    return { id: o.id, source: it.source, his_words: clip(it.text || '', 1500), router_said: o.reason, what_happened_after: after };
+  });
 }
 
 // ---- record ----
@@ -164,12 +249,20 @@ function main() {
     writeJSON(path.join(dir, 'items.json'), items);
     writeJSON(path.join(dir, 'context.json'), buildContext());
     console.log(`${items.length} items`);
+  } else if (cmd === 'evidence') {
+    const [dir] = rest;
+    const items = readJSON(path.join(dir, 'items.json'), []);
+    const routes = readJSON(path.join(dir, 'routes.json'), null);
+    if (!Array.isArray(routes)) { console.error('routes.json missing or not a JSON array'); process.exit(1); }
+    const ev = gatherEvidence(items, checkRoutes(items, routes).outcomes);
+    writeJSON(path.join(dir, 'evidence.json'), ev);
+    console.log(`${ev.length} G pieces, ${ev.filter(e => e.what_happened_after).length} with a record of what happened`);
   } else if (cmd === 'check') {
     const [dir] = rest;
     const items = readJSON(path.join(dir, 'items.json'), []);
     const routes = readJSON(path.join(dir, 'routes.json'), null);
     if (!Array.isArray(routes)) { console.error('routes.json missing or not a JSON array'); process.exit(1); }
-    const c = checkRoutes(items, routes);
+    const c = checkRoutes(items, routes, readJSON(path.join(dir, 'context.json'), null), readJSON(path.join(dir, 'gcheck.json'), fs.existsSync(path.join(dir, 'evidence.json')) ? [] : null));
     writeJSON(path.join(dir, 'checked.json'), c);
     console.log(`${c.outcomes.length} outcomes; problems: ${c.problems.length ? c.problems.join('; ') : 'none'}`);
   } else if (cmd === 'record') {
@@ -179,7 +272,7 @@ function main() {
     const all = recentOutcomes(Date.now(), days);
     console.log(JSON.stringify(sampleSheet(all, n), null, 1));
   } else {
-    console.error('usage: intake.mjs prepare <bundle> <dir> | check <dir> | record <dir> [--mode preview] | sheet [--days 7] [--n 30]');
+    console.error('usage: intake.mjs prepare <bundle> <dir> | evidence <dir> | check <dir> | record <dir> [--mode preview] | sheet [--days 7] [--n 30]');
     process.exit(2);
   }
 }
