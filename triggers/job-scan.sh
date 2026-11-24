@@ -1,5 +1,6 @@
 #!/bin/bash
-# Weekly job scan — systemd user timer job-scan.timer (Mondays 07:00, Persistent catch-up).
+# Weekly job scan — systemd user timer job-scan.timer (Sundays 17:00, Persistent catch-up; Mondays 07:00 until 2026-11-23).
+# The Sunday 18:00 retro prep (weekly-sprint-review.sh) grades what it finds, and runs it first if today's is missing.
 # No model: runs job_scan.py in the vault job-search folder, which reads the Excel tracker
 # (read-only) and rewrites the vault note "Job scan — weekly.md". Never writes Excel.
 # Log lines: "<ts> OK: new=N closed=N unreadable=N manual=N current=N" / "<ts> FAIL ...".

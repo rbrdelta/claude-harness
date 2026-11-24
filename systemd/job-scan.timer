@@ -1,8 +1,8 @@
 [Unit]
-Description=Weekly job scan — Monday 07:00, with catch-up
+Description=Weekly job scan — Sunday 17:00 (before the 18:00 retro prep grades it), with catch-up
 
 [Timer]
-OnCalendar=Mon 07:00
+OnCalendar=Sun 17:00
 Persistent=true
 Unit=job-scan.service
 

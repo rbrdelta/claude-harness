@@ -164,14 +164,17 @@ test('weekly-northstar-check: the OK summary is the agent\'s closing line, not a
 });
 
 // --- Weekly retro prep --------------------------------------------------------------------------
-function retroPrep(sb, { moments = '[{"thought":"x"}]', prep = true } = {}) {
+function retroPrep(sb, { moments = '[{"thought":"x"}]', prep = true, seats = true, scanToday = true } = {}) {
   const h = 'projects/active/claude-harness';
   sb.write(`${h}/tools/day-digest.py`, 'import sys; open(__import__("os").environ["SHIM_LOG"],"a").write("digest "+" ".join(sys.argv[1:])+"\\n"); print("## Session")');
   sb.write(`${h}/triggers/thought-synthesis.sh`, 'echo synthesis >> "$SHIM_LOG"');
   sb.write(`${h}/tools/retro-window.mjs`, `import fs from 'node:fs'; fs.appendFileSync(process.env.SHIM_LOG, 'retro ' + process.argv[2] + '\\n');`);
+  sb.write(`${h}/triggers/job-scan.sh`, 'echo jobscan >> "$SHIM_LOG"');
+  if (scanToday) sb.write('.claude/hooks/job-scan.log', `${today()} 17:00:01 OK: new=3 closed=1 unreadable=0 manual=0 current=9\n`);
   sb.write('claude-behavior.sh', `d=$(date +%Y-%m-%d); L="$HOME/.claude/logs"
 case "$2" in
   *"Find build moments"*) ${moments === null ? ':' : `printf '%s' '${moments}' > "$L/retro-moments-$d.json"`};;
+  *"Grade the week's new postings"*) ${seats ? `echo seats > "$L/retro-seats-$d.md"` : ':'};;
   *) ${prep ? `mkdir -p "$HOME/vault/Inbox"; echo prep > "$HOME/vault/Inbox/Retro Prep — $d.md"` : ':'};;
 esac`);
   return sb.copyScript('triggers/weekly-sprint-review.sh', 'bin/sprint-review.sh', { '/mnt/c/MCP': sb.path('vault') });
@@ -185,17 +188,24 @@ test('weekly-sprint-review: build moments, thought synthesis, then the prep (nee
   assert.ok(calls.includes('synthesis'));
   assert.ok(!calls.some((c) => c.startsWith('publish')), 'build moments no longer go to Notion');
   const ps = sb.prompts();
-  assert.equal(ps.length, 2);
+  assert.equal(ps.length, 3);
   assert.match(ps[0], /Find build moments/);
   assert.match(ps[0], /Keep at most 8/);
-  assert.match(ps[1], /## 1\. Did we move the needle\?[\s\S]*## 2\. Build review[\s\S]*## 3\. Subtraction candidates[\s\S]*## 4\. What is emerging/);
-  assert.match(ps[1], /Every project with commits or sessions this week, however many/);
-  assert.match(ps[1], /Claude's read/);
-  assert.doesNotMatch(ps[1], /__SESSIONS_FILE__|__MOMENTS_FILE__|retro-judge/);
-  assert.match(ps[1], new RegExp(`retro-moments-${today()}\\.json`));
+  assert.match(ps[1], /Grade the week's new postings/);
+  assert.match(ps[1], /Read in full, no slicing: .*CLAUDE\.md/);
+  assert.match(ps[1], /Never submit an application, contact anyone/);
+  assert.match(ps[1], new RegExp(`retro-seats-${today()}\\.md`));
+  assert.match(ps[2], /## 1\. Did we move the needle\?[\s\S]*## 2\. Build review[\s\S]*## 3\. Subtraction candidates[\s\S]*## 4\. What is emerging[\s\S]*## 5\. New seats this week/);
+  assert.match(ps[2], /Every project with commits or sessions this week, however many/);
+  assert.match(ps[2], /Claude's read/);
+  assert.doesNotMatch(ps[2], /__SESSIONS_FILE__|__MOMENTS_FILE__|__SEATS_FILE__|retro-judge/);
+  assert.match(ps[2], new RegExp(`retro-moments-${today()}\\.json`));
+  assert.match(ps[2], new RegExp(`retro-seats-${today()}\\.md`));
+  assert.ok(!calls.includes('jobscan'), "today's scan already ran, so it is not run again");
   const cl = sb.claudeCalls();
   assert.ok(cl[0].includes('[--model] [opus]') && cl[0].includes('[--allowedTools] [Read,Write]'));
   assert.ok(cl[1].includes('[--model] [opus]'));
+  assert.ok(cl[2].includes('[--model] [opus]'));
   assert.match(log(sb, 'weekly-sprint-review'), /OK: prep doc written to .*Retro Prep — \d{4}-\d{2}-\d{2}\.md/);
   assert.ok(calls.includes('retro open'));
 });
@@ -207,6 +217,16 @@ test('weekly-sprint-review: an empty moments pass is a warning, not fatal', () =
   assert.match(l, /WARN: build-moments pass produced nothing/);
   assert.equal(sb.read(`.claude/logs/retro-moments-${today()}.json`).trim(), '[]');
   assert.match(l, /OK: prep doc written/);
+});
+
+test('weekly-sprint-review: no scan today runs the scan first; no seats file is a warning and the prep still runs', () => {
+  const sb = base();
+  sb.run('bash', [retroPrep(sb, { seats: false, scanToday: false })]);
+  assert.ok(sb.calls().includes('jobscan'));
+  const l = log(sb, 'weekly-sprint-review');
+  assert.match(l, /WARN: seat grading produced nothing/);
+  assert.match(l, /OK: prep doc written/);
+  assert.match(sb.prompts()[2], /seat grading did not run this week/);
 });
 
 // --- Thought synthesis -------------------------------------------------------------------------

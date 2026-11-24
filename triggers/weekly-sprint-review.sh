@@ -63,6 +63,9 @@ End the section with: "Which of these go, plus one more?"
 ## 4. What is emerging
 From the thought synthesis (`/mnt/c/MCP/Inbox/Thought Synthesis.md`, updated just before this prep): copy its "What changed" section and its "Live themes" (at most five; the rest of the note is reference and is not shown). Thoughts the synthesis closed as done this week: list them in one line each, so Daniel can pull any back. If the synthesis did not run, say so.
 
+## 5. New seats this week
+Copy `__SEATS_FILE__` here as written (the week'\''s postings, read and graded before this prep). If the file is missing or empty, say in one line that seat grading did not run this week, so the retro grades them. Do not grade seats yourself.
+
 ## Open questions for Daniel
 3-5 questions drawn from the parts above, the first on part 1 (are we doing the important things). No status questions.
 
@@ -95,8 +98,27 @@ MOMENTS_PROMPT="Read $SESSIONS_FILE in full (page through it with offsets): this
 # Thought synthesis: the week's open thoughts traced to their context and folded into the living note.
 bash "$WORK_DIR/triggers/thought-synthesis.sh" || log "WARN: thought synthesis failed; see thought-synthesis.log"
 
+# New seats: the week's postings, read and graded before the retro (Daniel, 2026-11-10: "please research these
+# new opportunities before the retro as part of the weekly retro prep"; "You can write the excel without a
+# session."). Built 2026-11-23 after two weekly scans went ungraded: the scan ran Monday, after this prep, and
+# nothing read it. job-scan.timer now runs Sunday 17:00; if today's scan is missing, run it here.
+JOB_DIR="${JOB_SEARCH_DIR:-/mnt/c/MCP/job search/2026 ai pm}"
+SEATS_FILE="$OUTPUT_DIR/retro-seats-$(date +%Y-%m-%d).md"
+grep -q "^$(date +%Y-%m-%d) .* OK: new=" "$HOME/.claude/hooks/job-scan.log" 2>/dev/null \
+    || bash "$WORK_DIR/triggers/job-scan.sh" || log "WARN: job scan failed before seat grading; see job-scan.log"
+SEATS_PROMPT="Grade the week's new postings for Daniel's job search, unattended, before his weekly retro. Never submit an application, contact anyone, or draft outreach.
+1. Read in full, no slicing: '$JOB_DIR/CLAUDE.md' (the folder's rules; follow them, especially rules 9, 10, 12 and 13, the targeting rules, and the Sidekick lessons of 2026-11-23) and '$JOB_DIR/screen_sim/JUDGE.md'.
+2. Read '$JOB_DIR/Job scan — weekly.md'. The seats to grade: every line under 'New since last scan' and 'New on YC jobs', plus any seat a scan listed in the last 21 days that has no row in the Excel Pipeline sheet (see the 'Grade the week's postings' line in 'node ~/projects/active/daily-standard/scripts/ds.mjs backlog --json' for ones left over).
+3. For each seat, check Pipeline first (same link, or same company and role). Already there: say so, and if its Status is Closed or Applied note that the posting is back. Not there: fetch the full posting (Ashby: https://api.ashbyhq.com/posting-api/job-board/<slug>?includeCompensation=true; Greenhouse: boards-api.greenhouse.io; YC: the data-page JSON on the job page) and save it to '$JOB_DIR/jds/<company>__<role>.txt'. Read it whole before judging; a posting you could not fetch is listed as not read, never graded.
+4. Give every seat a Want (rule 10, appeal only, office-day adjustments). At Want 5 or more, write a screen judgment per JUDGE.md into '$JOB_DIR/screen_sim/judgments_scan_$(date +%Y%m%d)_<resume>/' against the resume text the newest results_*.json in screen_sim used, run 'python3 screen_sim.py <resume> <folder>' from '$JOB_DIR', and give a Human read. Fit and Tier per rule 12. Below Want 5: record only, with the reason.
+5. Write Excel ('$JOB_DIR/tracker.py' names the file): copy it to '$OUTPUT_DIR/job_tracker_backup_$(date +%Y%m%d).xlsx' first, re-read the sheet, append one row per new seat with the columns a recent row uses (Source 'Weekly scan <date>' or 'YC jobs (weekly scan <date>)'), and apply 'Pipeline postings that closed' (Status Closed, a dated note saying what the status was). If the save fails (the file is open in Excel), write nothing and say so. Then run verify_tracker.py, score_view.py and outreach_view.py in '$JOB_DIR'.
+6. Write '$SEATS_FILE': first what was read, what wasn't, and why; then the seats by tier (tier 1, 2, 3, 4), one line each with company, role, link, Want / Human / Screen, and the main gap in plain words; then record-only seats counted by reason; then postings already in Excel that came back; then closures applied; then whether Excel was written and verify_tracker's result. Plain words, no shorthand."
+( cd "$WORK_DIR" && claude -p "$SEATS_PROMPT" --model opus --allowedTools "Bash,Read,Write,Edit,Glob,Grep" --permission-mode bypassPermissions >/dev/null 2>&1 )
+[ -s "$SEATS_FILE" ] || log "WARN: seat grading produced nothing; the prep says so"
+
 PROMPT="${PROMPT//__SESSIONS_FILE__/$SESSIONS_FILE}"
 PROMPT="${PROMPT//__MOMENTS_FILE__/$MOMENTS_FILE}"
+PROMPT="${PROMPT//__SEATS_FILE__/$SEATS_FILE}"
 
 OUTPUT_FILE="$OUTPUT_DIR/sprint-review-$(date +%Y-%m-%d).txt"
 
