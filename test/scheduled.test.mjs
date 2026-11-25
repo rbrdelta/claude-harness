@@ -413,7 +413,7 @@ else if (cmd === 'task-add') { items.push({ id: 'new' + items.length, text: a[0]
 else if (cmd === 'task-set') { const t = items.find((x) => x.id === a[0]); t.detail = a[1].slice('detail='.length); console.log('set'); }
 fs.writeFileSync(db, JSON.stringify(items));`;
 
-test('outreach-due: due follow-ups go on the day\'s outreach work item (added to it, or created in Next), never the Tactical checklist; keys recorded once; FAIL when the backlog write fails; no model call', () => {
+test('outreach-due: due follow-ups go on the day\'s outreach work item (added to it, or created in Next), a new round for a top target is its own item, never the Tactical checklist; keys recorded once; FAIL when the backlog write fails; no model call', () => {
   const sb = base();
   const dir = sb.path('jobsearch');
   sb.write('jobsearch/outreach_view.py', 'import sys\nprint("Pat Lee|next\\tAcme: message Pat Lee (Lou quiet 5 days)")\nprint("Robin Diaz|next\\tGlobex: message Robin Diaz (Kim quiet 4 days)")');
@@ -443,6 +443,24 @@ test('outreach-due: due follow-ups go on the day\'s outreach work item (added to
   sb.run('bash', [s], { env });
   assert.equal(items().length, 1);
   assert.equal(items()[0].detail, 'Done when all are sent.\nReminders: Robin Diaz (Globex).\nFollow-ups due 11/18, added by the morning follow-up job:\n- Acme: message Pat Lee (Lou quiet 5 days)');
+
+  // A top target whose outreach ran its course: its own work item, a new round, not a line on the day's item;
+  // not made twice while one is open.
+  sb.write('jobsearch/outreach_view.py', 'import sys\nprint("Cresta|round|2026-11-12\\tCresta: outreach has run its course (3 messaged, last 11-12, no reply)")\nprint("Pat Lee|next\\tAcme: message Pat Lee (Lou quiet 5 days)")');
+  sb.write('state.txt', '');
+  sb.write('db.json', '[]');
+  sb.run('bash', [s], { env });
+  assert.match(log(sb, 'outreach-due'), /OK: due=2 pushed=2\n$/);
+  assert.equal(sb.read('state.txt'), 'Cresta|round|2026-11-12\nPat Lee|next\n');
+  const round = items().find((t) => t.text === 'New outreach round: Cresta');
+  assert.deepEqual([round.project, round.step, round.tier, round.source], ['Job search', 'job-search/follow-up', 'next', 'Outreach cadence']);
+  assert.match(round.detail, /^Done when the new round's first messages are sent/);
+  assert.match(round.detail, /Cresta: outreach has run its course/);
+  assert.doesNotMatch(items().find((t) => t.text === '11/18 job search outreach').detail, /Cresta/);
+  sb.write('state.txt', '');
+  sb.run('bash', [s], { env });
+  assert.equal(items().filter((t) => t.text === 'New outreach round: Cresta').length, 1);
+  sb.write('jobsearch/outreach_view.py', 'import sys\nprint("Pat Lee|next\\tAcme: message Pat Lee (Lou quiet 5 days)")\nprint("Robin Diaz|next\\tGlobex: message Robin Diaz (Kim quiet 4 days)")');
 
   // A failed backlog write: FAIL in the log, exit 1, no key recorded (so the next run tries again).
   sb.write('state.txt', '');
