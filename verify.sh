@@ -88,6 +88,11 @@ for t in systemd/*.timer; do
     [ -e "$UNITS/timers.target.wants/$name" ] && bad "pm-bookkeeping.timer is enabled; bookkeeping would run twice (cloud + laptop)"
   else
     [ -e "$UNITS/timers.target.wants/$name" ] || bad "$name is not enabled"
+    # Enabled is not started: intake-route.timer was enabled 11-21 without --now and never fired until the
+    # 11-26 reboot started it. A timer must be active to run.
+    if systemctl --user is-system-running >/dev/null 2>&1 || systemctl --user list-timers --no-pager >/dev/null 2>&1; then
+      [ "$(systemctl --user is-active "$name" 2>/dev/null)" = active ] || bad "$name is enabled but not active (run: systemctl --user start $name)"
+    fi
   fi
 done
 ok "systemd units checked against $UNITS"
