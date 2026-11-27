@@ -38,6 +38,7 @@ Pattern: `claude -p "$PROMPT" --model sonnet --allowedTools "Bash,Read,Write,Edi
 ## Windows Host Tasks
 
 - `windows/obsidian-restart.ps1` — Task Scheduler "Obsidian nightly restart", daily 04:00. Forces a full Obsidian Sync reconciliation (live upload can silently skip files; Learnings 2026-09-18). Install/update: `windows/install-obsidian-restart.ps1`. Log: `%LOCALAPPDATA%\claude-harness\obsidian-restart.log`, checked by `harness-check.sh`.
+- `windows/install-wsl-keepalive.ps1` — Task Scheduler "WSL keepalive", at logon (2026-11-26). Holds a hidden `wsl.exe` client open (`conhost --headless`, `exec sleep infinity`, no time limit) so WSL stays up after a Windows restart. Before it, the admin-created "WSL2 Cron Start" task ran `service cron start` and exited, WSL stopped about 30 s later, and a Windows Update restart at 00:07 on 11-26 left every laptop job and the remote-control daemon down for 21 hours (the 5-minute health check runs inside WSL, so it could not alert). The old task can't be changed without admin and is left in place. Check: `pgrep -af 'sleep infinity'`.
 
 ## Hooks
 
